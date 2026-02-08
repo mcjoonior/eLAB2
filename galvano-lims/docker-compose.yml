@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: galvano-lims-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: galvano_lims
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: galvano-lims-server
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/galvano_lims?schema=public
+      JWT_SECRET: galvano-lims-jwt-secret-change-in-production
+      JWT_REFRESH_SECRET: galvano-lims-refresh-secret-change-in-production
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      PORT: 3001
+      NODE_ENV: production
+      CORS_ORIGIN: http://localhost:5173
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - server_uploads:/app/uploads
+      - server_reports:/app/reports
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: galvano-lims-client
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - server
+
+volumes:
+  postgres_data:
+  server_uploads:
+  server_reports:

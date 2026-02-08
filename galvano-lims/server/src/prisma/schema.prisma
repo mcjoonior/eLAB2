@@ -1,0 +1,383 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserRole {
+  ADMIN
+  LABORANT
+  VIEWER
+}
+
+enum ProcessType {
+  ZINC
+  NICKEL
+  CHROME
+  COPPER
+  TIN
+  GOLD
+  SILVER
+  ANODIZING
+  PASSIVATION
+  OTHER
+}
+
+enum SampleType {
+  BATH
+  RINSE
+  WASTEWATER
+  RAW_MATERIAL
+  OTHER
+}
+
+enum SampleStatus {
+  REGISTERED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum AnalysisStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  APPROVED
+  REJECTED
+}
+
+enum Deviation {
+  CRITICAL_LOW
+  BELOW_MIN
+  WITHIN_RANGE
+  ABOVE_MAX
+  CRITICAL_HIGH
+}
+
+enum RecommendationType {
+  INCREASE
+  DECREASE
+  MAINTAIN
+  URGENT_ACTION
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ImportType {
+  FULL
+  CLIENTS_ONLY
+  ANALYSES_ONLY
+  PROCESSES_ONLY
+  SAMPLES_ONLY
+}
+
+enum ImportStatus {
+  UPLOADED
+  VALIDATING
+  VALIDATION_FAILED
+  IMPORTING
+  COMPLETED
+  PARTIALLY_COMPLETED
+  FAILED
+}
+
+// ============================================================
+// MODELS
+// ============================================================
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  role         UserRole @default(LABORANT)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  performedAnalyses  Analysis[]      @relation("PerformedBy")
+  approvedAnalyses   Analysis[]      @relation("ApprovedBy")
+  generatedReports   Report[]        @relation("GeneratedBy")
+  recommendations    Recommendation[] @relation("CreatedBy")
+  collectedSamples   Sample[]        @relation("CollectedBy")
+  importJobs         ImportJob[]     @relation("ImportedBy")
+  auditLogs          AuditLog[]
+
+  @@map("users")
+}
+
+model Client {
+  id            String   @id @default(uuid())
+  companyName   String
+  nip           String?  @unique
+  address       String?
+  city          String?
+  postalCode    String?
+  country       String   @default("Polska")
+  contactPerson String?
+  email         String?
+  phone         String?
+  notes         String?
+  isActive      Boolean  @default(true)
+  legacyCode    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  samples   Sample[]
+  processes Process[] @relation("ClientProcesses")
+
+  @@map("clients")
+}
+
+model Process {
+  id          String      @id @default(uuid())
+  name        String
+  description String?
+  processType ProcessType
+  clientId    String?
+  isActive    Boolean     @default(true)
+  legacyCode  String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  client     Client?            @relation("ClientProcesses", fields: [clientId], references: [id])
+  parameters ProcessParameter[]
+  samples    Sample[]
+
+  @@map("processes")
+}
+
+model ProcessParameter {
+  id            String   @id @default(uuid())
+  processId     String
+  parameterName String
+  unit          String
+  minValue      Decimal? @db.Decimal(12, 4)
+  maxValue      Decimal? @db.Decimal(12, 4)
+  optimalValue  Decimal? @db.Decimal(12, 4)
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+
+  // Relations
+  process Process @relation(fields: [processId], references: [id], onDelete: Cascade)
+
+  @@map("process_parameters")
+}
+
+model Sample {
+  id          String       @id @default(uuid())
+  sampleCode  String       @unique
+  clientId    String
+  processId   String
+  collectedBy String?
+  collectedAt DateTime     @default(now())
+  sampleType  SampleType   @default(BATH)
+  description String?
+  status      SampleStatus @default(REGISTERED)
+  legacyCode  String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  client    Client    @relation(fields: [clientId], references: [id])
+  process   Process   @relation(fields: [processId], references: [id])
+  collector User?     @relation("CollectedBy", fields: [collectedBy], references: [id])
+  analyses  Analysis[]
+
+  @@map("samples")
+}
+
+model Analysis {
+  id           String         @id @default(uuid())
+  analysisCode String         @unique
+  sampleId     String
+  performedBy  String
+  analysisDate DateTime       @default(now())
+  status       AnalysisStatus @default(PENDING)
+  notes        String?
+  approvedBy   String?
+  approvedAt   DateTime?
+  legacyCode   String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  // Relations
+  sample          Sample            @relation(fields: [sampleId], references: [id])
+  performer       User              @relation("PerformedBy", fields: [performedBy], references: [id])
+  approver        User?             @relation("ApprovedBy", fields: [approvedBy], references: [id])
+  results         AnalysisResult[]
+  recommendations Recommendation[]
+  reports         Report[]
+
+  @@map("analyses")
+}
+
+model AnalysisResult {
+  id               String    @id @default(uuid())
+  analysisId       String
+  parameterName    String
+  unit             String
+  value            Decimal   @db.Decimal(12, 4)
+  minReference     Decimal?  @db.Decimal(12, 4)
+  maxReference     Decimal?  @db.Decimal(12, 4)
+  optimalReference Decimal?  @db.Decimal(12, 4)
+  deviation        Deviation @default(WITHIN_RANGE)
+  deviationPercent Decimal?  @db.Decimal(8, 2)
+  createdAt        DateTime  @default(now())
+
+  // Relations
+  analysis Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@map("analysis_results")
+}
+
+model Recommendation {
+  id                 String             @id @default(uuid())
+  analysisId         String
+  parameterName      String
+  currentValue       Decimal?           @db.Decimal(12, 4)
+  targetValue        Decimal?           @db.Decimal(12, 4)
+  recommendationType RecommendationType
+  description        String
+  priority           Priority           @default(MEDIUM)
+  createdBy          String
+  createdAt          DateTime           @default(now())
+
+  // Relations
+  analysis Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  creator  User     @relation("CreatedBy", fields: [createdBy], references: [id])
+
+  @@map("recommendations")
+}
+
+model Report {
+  id          String   @id @default(uuid())
+  reportCode  String   @unique
+  analysisId  String
+  generatedBy String
+  generatedAt DateTime @default(now())
+  pdfPath     String?
+  sentToClient Boolean @default(false)
+  sentAt       DateTime?
+  sentToEmail  String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  analysis  Analysis @relation(fields: [analysisId], references: [id])
+  generator User     @relation("GeneratedBy", fields: [generatedBy], references: [id])
+
+  @@map("reports")
+}
+
+model CompanySettings {
+  id               String  @id @default(uuid())
+  companyName      String  @default("Laboratorium Galwaniczne")
+  logoUrl          String?
+  address          String?
+  city             String?
+  postalCode       String?
+  nip              String?
+  phone            String?
+  email            String?
+  website          String?
+  smtpHost         String?
+  smtpPort         Int?    @default(587)
+  smtpUser         String?
+  smtpPassword     String?
+  smtpFrom         String?
+  reportHeaderText String? @default("Raport z analizy laboratoryjnej")
+  reportFooterText String? @default("Dokument wygenerowany automatycznie przez system LIMS")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("company_settings")
+}
+
+model ImportJob {
+  id               String       @id @default(uuid())
+  importCode       String       @unique
+  importedBy       String
+  sourceSystem     String?
+  importType       ImportType   @default(FULL)
+  status           ImportStatus @default(UPLOADED)
+  fileName         String?
+  fileSize         Int?
+  totalRecords     Int          @default(0)
+  importedRecords  Int          @default(0)
+  skippedRecords   Int          @default(0)
+  errorRecords     Int          @default(0)
+  validationErrors Json?
+  mappingConfig    Json?
+  notes            String?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime     @default(now())
+
+  // Relations
+  importer User @relation("ImportedBy", fields: [importedBy], references: [id])
+
+  @@map("import_jobs")
+}
+
+model ImportTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  mappingConfig Json
+  sourceSystem  String?
+  createdBy   String
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("import_templates")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  action     String
+  entityType String
+  entityId   String?
+  details    Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  type      String   @default("info") // info, warning, error, success
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
