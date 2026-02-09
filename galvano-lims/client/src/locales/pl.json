@@ -188,6 +188,13 @@
     "companyInfo": "Dane firmy",
     "reportSettings": "Ustawienia raportów"
   },
+  "search": {
+    "clients": "Klienci",
+    "samples": "Próbki",
+    "analyses": "Analizy",
+    "processAnalyses": "Analizy procesu",
+    "noResults": "Brak wyników"
+  },
   "common": {
     "save": "Zapisz",
     "cancel": "Anuluj",

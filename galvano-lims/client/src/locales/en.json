@@ -188,6 +188,13 @@
     "companyInfo": "Company info",
     "reportSettings": "Report settings"
   },
+  "search": {
+    "clients": "Clients",
+    "samples": "Samples",
+    "analyses": "Analyses",
+    "processAnalyses": "Process analyses",
+    "noResults": "No results"
+  },
   "common": {
     "save": "Save",
     "cancel": "Cancel",

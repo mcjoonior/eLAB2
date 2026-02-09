@@ -234,6 +234,42 @@ export interface Notification {
 // API Types
 // ============================================================
 
+export interface GlobalSearchClientResult {
+  id: string;
+  companyName: string;
+  nip?: string | null;
+  city?: string | null;
+}
+
+export interface GlobalSearchSampleResult {
+  id: string;
+  sampleCode: string;
+  status: SampleStatus;
+  client?: { id: string; companyName: string };
+  process?: { id: string; name: string };
+}
+
+export interface GlobalSearchAnalysisResult {
+  id: string;
+  analysisCode: string;
+  status: AnalysisStatus;
+  sample?: {
+    id?: string;
+    sampleCode: string;
+    client?: { id: string; companyName: string };
+    process?: { id: string; name: string };
+  };
+}
+
+export interface GlobalSearchResponse {
+  data: {
+    clients: GlobalSearchClientResult[];
+    samples: GlobalSearchSampleResult[];
+    analyses: GlobalSearchAnalysisResult[];
+    processAnalyses: GlobalSearchAnalysisResult[];
+  };
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   pagination: {
