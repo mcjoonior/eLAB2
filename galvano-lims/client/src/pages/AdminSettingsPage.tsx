@@ -1,9 +1,9 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { adminService } from '@/services/adminService';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import type { CompanySettings } from '@/types';
-import { Building2, Mail, FileText, Save, TestTube2, CheckCircle, XCircle } from 'lucide-react';
+import { Building2, Mail, FileText, Save, TestTube2, CheckCircle, XCircle, Upload, Trash2, ImageIcon } from 'lucide-react';
 
 type Tab = 'company' | 'smtp' | 'reports';
 
@@ -17,6 +17,10 @@ export default function AdminSettingsPage() {
   const [error, setError] = useState('');
   const [testingSmtp, setTestingSmtp] = useState(false);
   const [smtpResult, setSmtpResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Logo upload
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { fetchSettings(); }, []);
 
@@ -42,6 +46,28 @@ export default function AdminSettingsPage() {
     finally { setSaving(false); }
   }
 
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingLogo(true);
+    setError('');
+    try {
+      const result = await adminService.uploadLogo(file);
+      setSettings((prev) => prev ? { ...prev, logoUrl: result.logoUrl } : prev);
+      setSuccess('Logo zostało przesłane pomyślnie.');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch {
+      setError('Nie udało się przesłać logo. Dozwolone formaty: PNG, JPG, JPEG (max 5MB).');
+    } finally {
+      setUploadingLogo(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  function handleRemoveLogo() {
+    setSettings((prev) => prev ? { ...prev, logoUrl: undefined } : prev);
+  }
+
   async function handleTestSmtp() {
     setTestingSmtp(true); setSmtpResult(null);
     try {
@@ -59,6 +85,8 @@ export default function AdminSettingsPage() {
 
   if (loading) return <LoadingSpinner text="Ładowanie ustawień..." />;
   if (!settings) return <div className="text-center text-red-500 py-12">Nie udało się załadować ustawień.</div>;
+
+  const logoSrc = settings.logoUrl || null;
 
   const tabs: { id: Tab; label: string; icon: typeof Building2 }[] = [
     { id: 'company', label: t('admin.companyInfo'), icon: Building2 },
@@ -93,12 +121,76 @@ export default function AdminSettingsPage() {
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
           {/* Company tab */}
           {activeTab === 'company' && (
-            <div className="space-y-4 max-w-2xl">
+            <div className="space-y-6 max-w-2xl">
+              {/* Logo upload section */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nazwa firmy</label>
-                <input type="text" value={settings.companyName || ''} onChange={(e) => updateField('companyName', e.target.value)}
-                  className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none" />
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Logo aplikacji</label>
+                <div className="flex items-start gap-4">
+                  <div className="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-gray-900/50 flex-shrink-0">
+                    {logoSrc ? (
+                      <img src={logoSrc} alt="Logo" className="w-full h-full object-contain" />
+                    ) : (
+                      <ImageIcon className="h-8 w-8 text-gray-400" />
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".png,.jpg,.jpeg"
+                        onChange={handleLogoUpload}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadingLogo}
+                        className="inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-60 transition-colors"
+                      >
+                        {uploadingLogo ? (
+                          <div className="h-4 w-4 border-2 border-gray-400 border-t-gray-700 rounded-full animate-spin" />
+                        ) : (
+                          <Upload className="h-4 w-4" />
+                        )}
+                        Wgraj logo
+                      </button>
+                      {settings.logoUrl && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveLogo}
+                          className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Usuń
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Dozwolone formaty: PNG, JPG, JPEG. Maksymalny rozmiar: 5MB.
+                    </p>
+                  </div>
+                </div>
               </div>
+
+              {/* Company name & subtitle */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nazwa firmy (w sidebarze)</label>
+                  <input type="text" value={settings.companyName || ''} onChange={(e) => updateField('companyName', e.target.value)}
+                    className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Podtytuł (pod nazwą)</label>
+                  <input type="text" value={settings.appSubtitle || ''} onChange={(e) => updateField('appSubtitle', e.target.value)}
+                    placeholder="LIMS"
+                    className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none" />
+                </div>
+              </div>
+
+              <hr className="border-gray-200 dark:border-gray-700" />
+
+              {/* Rest of company fields */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Adres</label>

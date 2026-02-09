@@ -1,6 +1,17 @@
 import api from './api';
 import type { User, CompanySettings, AuditLog, PaginatedResponse, Notification } from '@/types';
 
+export interface Branding {
+  companyName: string;
+  appSubtitle: string;
+  logoUrl: string | null;
+}
+
+export async function getBranding(): Promise<Branding> {
+  const response = await api.get('/branding');
+  return response.data;
+}
+
 export const adminService = {
   // Users
   async getUsers(): Promise<User[]> {

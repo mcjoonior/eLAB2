@@ -155,6 +155,7 @@ export interface Report {
 export interface CompanySettings {
   id: string;
   companyName: string;
+  appSubtitle?: string;
   logoUrl?: string;
   address?: string;
   city?: string;

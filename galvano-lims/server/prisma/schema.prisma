@@ -288,6 +288,7 @@ model Report {
 model CompanySettings {
   id               String  @id @default(uuid())
   companyName      String  @default("Laboratorium Galwaniczne")
+  appSubtitle      String? @default("LIMS")
   logoUrl          String?
   address          String?
   city             String?

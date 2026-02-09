@@ -73,6 +73,20 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/archive', archiveRoutes);
 app.use('/api/notifications', notificationRoutes);
 
+// Public branding endpoint (no auth required)
+app.get('/api/branding', async (_req, res) => {
+  try {
+    const settings = await prisma.companySettings.findFirst();
+    res.json({
+      companyName: settings?.companyName ?? 'Laboratorium Galwaniczne',
+      appSubtitle: (settings as any)?.appSubtitle ?? 'LIMS',
+      logoUrl: settings?.logoUrl ?? null,
+    });
+  } catch {
+    res.json({ companyName: 'Laboratorium Galwaniczne', appSubtitle: 'LIMS', logoUrl: null });
+  }
+});
+
 // Health check
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
