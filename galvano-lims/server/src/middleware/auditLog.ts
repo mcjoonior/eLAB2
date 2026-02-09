@@ -55,7 +55,7 @@ export async function createAuditLog(entry: AuditLogEntry): Promise<void> {
         action: entry.action,
         entityType: entry.entityType,
         entityId: entry.entityId ?? null,
-        details: entry.details ?? undefined,
+        details: (entry.details as any) ?? undefined,
         ipAddress: entry.ipAddress ?? null,
       },
     });

@@ -18,6 +18,10 @@ export interface JwtPayload {
 // Extend Express Request globally with authenticated user data
 // ---------------------------------------------------------------------------
 
+export interface AuthenticatedRequest extends Request {
+  user?: JwtPayload;
+}
+
 declare global {
   namespace Express {
     interface Request {

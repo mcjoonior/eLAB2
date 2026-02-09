@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
-import { prisma } from '../../index';
+import { prisma } from '../index';
 import { AuthenticatedRequest } from '../middleware/auth';
 
 // ============================================================
@@ -12,7 +12,7 @@ const createSampleSchema = z.object({
   clientId: z.string().uuid('Nieprawidłowy identyfikator klienta'),
   processId: z.string().uuid('Nieprawidłowy identyfikator procesu'),
   collectedBy: z.string().uuid().optional().nullable(),
-  collectedAt: z.string().datetime().optional().nullable(),
+  collectedAt: z.string().optional().nullable(),
   sampleType: z.enum(['BATH', 'RINSE', 'WASTEWATER', 'RAW_MATERIAL', 'OTHER']).optional().default('BATH'),
   description: z.string().optional().nullable(),
 });
@@ -76,7 +76,7 @@ export const getSamples = async (req: AuthenticatedRequest, res: Response, next:
       limit = '25',
       sortBy = 'createdAt',
       sortOrder = 'desc',
-    } = req.query;
+    } = req.query as Record<string, string | undefined>;
 
     const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
     const limitNum = Math.min(100, Math.max(1, parseInt(limit as string, 10) || 25));
@@ -235,7 +235,7 @@ export const createSample = async (req: AuthenticatedRequest, res: Response, nex
         sampleCode,
         clientId: data.clientId,
         processId: data.processId,
-        collectedBy: data.collectedBy ?? req.user!.id,
+        collectedBy: data.collectedBy ?? req.user!.userId,
         collectedAt: data.collectedAt ? new Date(data.collectedAt) : new Date(),
         sampleType: data.sampleType,
         description: data.description,
@@ -250,7 +250,7 @@ export const createSample = async (req: AuthenticatedRequest, res: Response, nex
 
     await prisma.auditLog.create({
       data: {
-        userId: req.user!.id,
+        userId: req.user!.userId,
         action: 'CREATE',
         entityType: 'SAMPLE',
         entityId: sample.id,
@@ -305,7 +305,7 @@ export const updateSample = async (req: AuthenticatedRequest, res: Response, nex
 
     await prisma.auditLog.create({
       data: {
-        userId: req.user!.id,
+        userId: req.user!.userId,
         action: 'UPDATE',
         entityType: 'SAMPLE',
         entityId: id,
@@ -372,7 +372,7 @@ export const changeSampleStatus = async (req: AuthenticatedRequest, res: Respons
 
     await prisma.auditLog.create({
       data: {
-        userId: req.user!.id,
+        userId: req.user!.userId,
         action: 'STATUS_CHANGE',
         entityType: 'SAMPLE',
         entityId: id,

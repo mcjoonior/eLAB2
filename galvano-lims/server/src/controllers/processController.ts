@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
-import { prisma } from '../../index';
+import { prisma } from '../index';
 import { AuthenticatedRequest } from '../middleware/auth';
 
 // ============================================================
@@ -44,7 +44,7 @@ export const getProcesses = async (req: AuthenticatedRequest, res: Response, nex
       limit = '25',
       sortBy = 'name',
       sortOrder = 'asc',
-    } = req.query;
+    } = req.query as Record<string, string | undefined>;
 
     const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
     const limitNum = Math.min(100, Math.max(1, parseInt(limit as string, 10) || 25));
@@ -164,11 +164,11 @@ export const createProcess = async (req: AuthenticatedRequest, res: Response, ne
 
     const { parameters, ...processData } = validation.data;
 
-    const process = await prisma.process.create({
+    const process = await (prisma.process.create as any)({
       data: {
         ...processData,
         parameters: {
-          create: parameters.map((p, index) => ({
+          create: parameters.map((p: any, index: number) => ({
             parameterName: p.parameterName,
             unit: p.unit,
             minValue: p.minValue,
@@ -186,7 +186,7 @@ export const createProcess = async (req: AuthenticatedRequest, res: Response, ne
 
     await prisma.auditLog.create({
       data: {
-        userId: req.user!.id,
+        userId: req.user!.userId,
         action: 'CREATE',
         entityType: 'PROCESS',
         entityId: process.id,
@@ -297,7 +297,7 @@ export const updateProcess = async (req: AuthenticatedRequest, res: Response, ne
 
     await prisma.auditLog.create({
       data: {
-        userId: req.user!.id,
+        userId: req.user!.userId,
         action: 'UPDATE',
         entityType: 'PROCESS',
         entityId: id,
@@ -325,7 +325,7 @@ export const cloneProcess = async (req: AuthenticatedRequest, res: Response, nex
       return;
     }
 
-    const original = await prisma.process.findUnique({
+    const original: any = await prisma.process.findUnique({
       where: { id },
       include: { parameters: { orderBy: { sortOrder: 'asc' } } },
     });
@@ -360,7 +360,7 @@ export const cloneProcess = async (req: AuthenticatedRequest, res: Response, nex
 
     await prisma.auditLog.create({
       data: {
-        userId: req.user!.id,
+        userId: req.user!.userId,
         action: 'CLONE',
         entityType: 'PROCESS',
         entityId: cloned.id,
@@ -395,7 +395,7 @@ export const deleteProcess = async (req: AuthenticatedRequest, res: Response, ne
 
     await prisma.auditLog.create({
       data: {
-        userId: req.user!.id,
+        userId: req.user!.userId,
         action: 'DELETE',
         entityType: 'PROCESS',
         entityId: id,

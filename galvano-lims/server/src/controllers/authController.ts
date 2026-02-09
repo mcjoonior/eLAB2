@@ -87,7 +87,7 @@ export async function register(
       );
     }
 
-    const user = await registerUser(parsed.data);
+    const user = await registerUser(parsed.data as any);
 
     res.status(201).json({
       success: true,
@@ -125,7 +125,7 @@ export async function login(
       );
     }
 
-    const { user, tokens } = await loginUser(parsed.data);
+    const { user, tokens } = await loginUser(parsed.data as any);
 
     // Ustaw refresh token jako httpOnly cookie
     res.cookie(REFRESH_TOKEN_COOKIE, tokens.refreshToken, {

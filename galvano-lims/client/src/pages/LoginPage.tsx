@@ -20,7 +20,8 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const { user, accessToken } = await authService.login({ email, password });
+      const response = await authService.login({ email, password });
+      const { user, accessToken } = (response as any).data;
       useAuthStore.getState().setAuth(user, accessToken);
       navigate('/');
     } catch (err: any) {

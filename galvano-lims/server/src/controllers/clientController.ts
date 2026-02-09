@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
-import { prisma } from '../../index';
+import { prisma } from '../index';
 import { AuthenticatedRequest } from '../middleware/auth';
 
 // ============================================================
@@ -38,7 +38,7 @@ export const getClients = async (req: AuthenticatedRequest, res: Response, next:
       limit = '25',
       sortBy = 'companyName',
       sortOrder = 'asc',
-    } = req.query;
+    } = req.query as Record<string, string | undefined>;
 
     const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
     const limitNum = Math.min(100, Math.max(1, parseInt(limit as string, 10) || 25));
@@ -198,7 +198,7 @@ export const createClient = async (req: AuthenticatedRequest, res: Response, nex
     // Log audytu
     await prisma.auditLog.create({
       data: {
-        userId: req.user!.id,
+        userId: req.user!.userId,
         action: 'CREATE',
         entityType: 'CLIENT',
         entityId: client.id,
@@ -253,7 +253,7 @@ export const updateClient = async (req: AuthenticatedRequest, res: Response, nex
 
     await prisma.auditLog.create({
       data: {
-        userId: req.user!.id,
+        userId: req.user!.userId,
         action: 'UPDATE',
         entityType: 'CLIENT',
         entityId: client.id,
@@ -288,7 +288,7 @@ export const deleteClient = async (req: AuthenticatedRequest, res: Response, nex
 
     await prisma.auditLog.create({
       data: {
-        userId: req.user!.id,
+        userId: req.user!.userId,
         action: 'DELETE',
         entityType: 'CLIENT',
         entityId: client.id,

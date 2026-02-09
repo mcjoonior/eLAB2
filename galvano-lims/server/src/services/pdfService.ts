@@ -296,8 +296,11 @@ export async function generateReportPdf(analysisId: string, reportCode: string):
 
     const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
 
-    // ---- Register fonts (use built-in Helvetica) ----
-    // PDFKit ships with Helvetica which supports basic Latin.
+    // ---- Register fonts with Polish diacritics support ----
+    const DEJAVU_DIR = '/usr/share/fonts/dejavu';
+    doc.registerFont('DejaVu', path.join(DEJAVU_DIR, 'DejaVuSans.ttf'));
+    doc.registerFont('DejaVu-Bold', path.join(DEJAVU_DIR, 'DejaVuSans-Bold.ttf'));
+    doc.font('DejaVu');
 
     // ================================================================
     // HEADER
