@@ -69,25 +69,20 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         }`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-border">
-          <div className="flex items-center gap-2">
-            {logoUrl ? (
-              <img src={logoUrl} alt="Logo" className="h-8 w-8 object-contain flex-shrink-0 rounded" />
-            ) : (
-              <Beaker className="h-7 w-7 text-primary flex-shrink-0" />
-            )}
-            <div className="min-w-0">
-              <h1 className="text-sm font-bold text-foreground leading-tight truncate">
-                {branding?.companyName || 'GalvanoTech'}
-              </h1>
-              <p className="text-[10px] text-muted-foreground leading-tight truncate">
-                {branding?.appSubtitle || 'LIMS'}
-              </p>
-            </div>
-          </div>
-          <button onClick={onClose} className="lg:hidden p-1 rounded hover:bg-accent">
+        <div className="relative px-4 py-4 border-b border-border">
+          <button onClick={onClose} className="lg:hidden absolute top-2 right-2 p-1 rounded hover:bg-accent">
             <X className="h-5 w-5" />
           </button>
+          <div className="flex flex-col items-center gap-3">
+            {logoUrl ? (
+              <img src={logoUrl} alt="Logo" className="max-h-12 max-w-[180px] object-contain rounded" />
+            ) : (
+              <Beaker className="h-10 w-10 text-primary" />
+            )}
+            <h1 className="text-sm font-bold text-foreground leading-tight truncate text-center w-full">
+              {branding?.companyName || 'GalvanoTech'}
+            </h1>
+          </div>
         </div>
 
         {/* Navigation */}

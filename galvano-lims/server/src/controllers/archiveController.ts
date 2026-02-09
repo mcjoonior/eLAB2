@@ -457,35 +457,36 @@ export const getDeviationStats = async (req: AuthenticatedRequest, res: Response
       prisma.analysisResult.count({ where }),
     ]);
 
-    // Najczesciej wystepujace odchylenia po parametrze
-    const criticalResults = await prisma.analysisResult.findMany({
-      where: {
-        ...where,
-        deviation: { in: ['CRITICAL_LOW', 'CRITICAL_HIGH', 'BELOW_MIN', 'ABOVE_MAX'] },
-      },
+    // Wszystkie wyniki pogrupowane po parametrze i odchyleniu
+    const allResults = await prisma.analysisResult.findMany({
+      where,
       select: {
         parameterName: true,
         deviation: true,
       },
     });
 
-    // Grupuj po parametrze
+    // Grupuj po parametrze (wszystkie typy odchylen wlacznie z WITHIN_RANGE)
     const parameterStats: Record<string, Record<string, number>> = {};
-    for (const r of criticalResults) {
+    for (const r of allResults) {
       if (!parameterStats[r.parameterName]) {
         parameterStats[r.parameterName] = {};
       }
       parameterStats[r.parameterName][r.deviation] = (parameterStats[r.parameterName][r.deviation] || 0) + 1;
     }
 
-    // Posortuj parametry po lacznej liczbie odchylen
+    // Posortuj parametry po lacznej liczbie odchylen (bez WITHIN_RANGE)
     const parameterBreakdown = Object.entries(parameterStats)
       .map(([param, deviations]) => ({
         parameterName: param,
         total: Object.values(deviations).reduce((s, v) => s + v, 0),
         deviations,
       }))
-      .sort((a, b) => b.total - a.total)
+      .sort((a, b) => {
+        const aDevs = a.total - (a.deviations['WITHIN_RANGE'] || 0);
+        const bDevs = b.total - (b.deviations['WITHIN_RANGE'] || 0);
+        return bDevs - aDevs;
+      })
       .slice(0, 20);
 
     res.json({

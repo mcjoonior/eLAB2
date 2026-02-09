@@ -21,17 +21,14 @@ import {
   BarChart3,
   Table as TableIcon,
 } from 'lucide-react';
-import { archiveService } from '@/services/archiveService';
+import { archiveService, type ArchiveAnalysisRow, type DeviationData } from '@/services/archiveService';
 import { clientService } from '@/services/clientService';
 import { processService } from '@/services/processService';
 import type {
   Client,
   Process,
   ProcessParameter,
-  Analysis,
   TrendDataPoint,
-  PaginatedResponse,
-  Deviation,
 } from '@/types';
 import {
   getDeviationBadgeColor,
@@ -44,28 +41,6 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Pagination } from '@/components/common/Pagination';
 
 type TabKey = 'trend' | 'deviations' | 'table';
-
-interface DeviationData {
-  parameterName: string;
-  withinRange: number;
-  belowMin: number;
-  aboveMax: number;
-  criticalLow: number;
-  criticalHigh: number;
-}
-
-interface ArchiveAnalysis {
-  id: string;
-  date: string;
-  analysisCode: string;
-  clientName: string;
-  processName: string;
-  parameterName: string;
-  value: number;
-  min?: number;
-  max?: number;
-  deviation: Deviation;
-}
 
 interface Filters {
   clientId: string;
@@ -98,7 +73,7 @@ export default function ArchivePage() {
   // --- Data ---
   const [trendData, setTrendData] = useState<TrendDataPoint[]>([]);
   const [deviationData, setDeviationData] = useState<DeviationData[]>([]);
-  const [analyses, setAnalyses] = useState<ArchiveAnalysis[]>([]);
+  const [analyses, setAnalyses] = useState<ArchiveAnalysisRow[]>([]);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
@@ -179,7 +154,7 @@ export default function ArchivePage() {
           const data = await archiveService.getDeviations(params);
           setDeviationData(data);
         } else if (activeTab === 'table') {
-          const res: PaginatedResponse<any> = await archiveService.getAnalyses({
+          const res = await archiveService.getAnalyses({
             ...params,
             page,
             limit: pagination.limit,
