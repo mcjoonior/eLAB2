@@ -1,6 +1,8 @@
+import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
+import { getBranding, type Branding } from '@/services/adminService';
 import {
   LayoutDashboard,
   Users,
@@ -24,6 +26,13 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
+  const [branding, setBranding] = useState<Branding | null>(null);
+
+  useEffect(() => {
+    getBranding()
+      .then(setBranding)
+      .catch(() => {});
+  }, []);
 
   const navItems = [
     { to: '/', icon: LayoutDashboard, label: t('nav.dashboard') },
@@ -42,6 +51,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { to: '/admin/audit-log', icon: FileText, label: t('nav.auditLog') },
   ];
 
+  const logoUrl = branding?.logoUrl || null;
+
   return (
     <>
       {/* Mobile overlay */}
@@ -58,17 +69,20 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         }`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-border">
-          <div className="flex items-center gap-2">
-            <Beaker className="h-7 w-7 text-primary" />
-            <div>
-              <h1 className="text-sm font-bold text-foreground leading-tight">GalvanoTech</h1>
-              <p className="text-[10px] text-muted-foreground leading-tight">LIMS</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="lg:hidden p-1 rounded hover:bg-accent">
+        <div className="relative px-4 py-4 border-b border-border">
+          <button onClick={onClose} className="lg:hidden absolute top-2 right-2 p-1 rounded hover:bg-accent">
             <X className="h-5 w-5" />
           </button>
+          <div className="flex flex-col items-center gap-3">
+            {logoUrl ? (
+              <img src={logoUrl} alt="Logo" className="max-h-12 max-w-[180px] object-contain rounded" />
+            ) : (
+              <Beaker className="h-10 w-10 text-primary" />
+            )}
+            <h1 className="text-sm font-bold text-foreground leading-tight truncate text-center w-full">
+              {branding?.companyName || 'GalvanoTech'}
+            </h1>
+          </div>
         </div>
 
         {/* Navigation */}

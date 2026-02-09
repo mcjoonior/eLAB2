@@ -36,7 +36,7 @@ export const analysisService = {
   },
 
   async saveResults(id: string, results: Partial<AnalysisResult>[]): Promise<AnalysisResult[]> {
-    const response = await api.post(`/analyses/${id}/results`, { results });
+    const response = await api.post(`/analyses/${id}/results`, results);
     return response.data;
   },
 

@@ -9,6 +9,10 @@ import {
   CheckCircle,
   Plus,
   AlertTriangle,
+  Play,
+  Square,
+  RotateCcw,
+  Trash2,
 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { analysisService } from '@/services/analysisService';
@@ -30,14 +34,29 @@ import {
 import type {
   Analysis,
   AnalysisResult,
+  AnalysisStatus,
   Recommendation,
   Deviation,
   Priority,
   RecommendationType,
+  ProcessParameter,
 } from '@/types';
 
 const PRIORITIES: Priority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 const RECOMMENDATION_TYPES: RecommendationType[] = ['INCREASE', 'DECREASE', 'MAINTAIN', 'URGENT_ACTION'];
+
+interface NewResultRow {
+  parameterName: string;
+  unit: string;
+  value: string;
+  minReference: string;
+  maxReference: string;
+  optimalReference: string;
+}
+
+function emptyRow(): NewResultRow {
+  return { parameterName: '', unit: '', value: '', minReference: '', maxReference: '', optimalReference: '' };
+}
 
 function getRowBgColor(deviation: Deviation): string {
   switch (deviation) {
@@ -54,6 +73,13 @@ function getRowBgColor(deviation: Deviation): string {
   }
 }
 
+/** Allowed workflow transitions */
+const ALLOWED_TRANSITIONS: Record<string, { status: AnalysisStatus; label: string; icon: typeof Play; color: string }[]> = {
+  PENDING: [{ status: 'IN_PROGRESS', label: 'Rozpocznij analizę', icon: Play, color: 'bg-blue-600 hover:bg-blue-700 text-white' }],
+  IN_PROGRESS: [{ status: 'COMPLETED', label: 'Zakończ analizę', icon: Square, color: 'bg-emerald-600 hover:bg-emerald-700 text-white' }],
+  REJECTED: [{ status: 'IN_PROGRESS', label: 'Wznów analizę', icon: RotateCcw, color: 'bg-blue-600 hover:bg-blue-700 text-white' }],
+};
+
 export default function AnalysisDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -64,11 +90,17 @@ export default function AnalysisDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Results editing
+  // Results editing (existing results)
   const [resultValues, setResultValues] = useState<Record<string, string>>({});
   const [savingResults, setSavingResults] = useState(false);
   const [resultSuccess, setResultSuccess] = useState('');
   const [resultError, setResultError] = useState('');
+
+  // New results entry
+  const [newResults, setNewResults] = useState<NewResultRow[]>([]);
+
+  // Status change
+  const [changingStatus, setChangingStatus] = useState(false);
 
   // Recommendations
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
@@ -105,13 +137,29 @@ export default function AnalysisDetailPage() {
     try {
       const data = await analysisService.getById(id!);
       setAnalysis(data);
-      // Initialize result values
-      if (data.results) {
+      // Initialize result values for existing results
+      if (data.results && data.results.length > 0) {
         const values: Record<string, string> = {};
         data.results.forEach((r) => {
           values[r.id] = r.value != null ? String(r.value) : '';
         });
         setResultValues(values);
+        setNewResults([]);
+      } else {
+        // Pre-populate new results from process parameters
+        const params = (data.sample?.process as any)?.parameters as ProcessParameter[] | undefined;
+        if (params && params.length > 0) {
+          setNewResults(params.map((p) => ({
+            parameterName: p.parameterName,
+            unit: p.unit,
+            value: '',
+            minReference: p.minValue != null ? String(p.minValue) : '',
+            maxReference: p.maxValue != null ? String(p.maxValue) : '',
+            optimalReference: p.optimalValue != null ? String(p.optimalValue) : '',
+          })));
+        } else {
+          setNewResults([]);
+        }
       }
     } catch {
       setError('Nie udało się pobrać szczegółów analizy.');
@@ -132,7 +180,26 @@ export default function AnalysisDetailPage() {
   const isEditable = analysis && (analysis.status === 'PENDING' || analysis.status === 'IN_PROGRESS');
   const isAdmin = user?.role === 'ADMIN';
   const canApprove = isAdmin && analysis?.status === 'COMPLETED';
+  const hasExistingResults = analysis?.results && analysis.results.length > 0;
 
+  // ---- Status change ----
+  async function handleChangeStatus(newStatus: AnalysisStatus) {
+    setChangingStatus(true);
+    setActionError('');
+    setActionSuccess('');
+    try {
+      await analysisService.changeStatus(id!, newStatus);
+      setActionSuccess(`Status analizy zmieniony na "${getAnalysisStatusLabel(newStatus)}".`);
+      setTimeout(() => setActionSuccess(''), 3000);
+      fetchAnalysis();
+    } catch (err: any) {
+      setActionError(err?.response?.data?.error || 'Nie udało się zmienić statusu.');
+    } finally {
+      setChangingStatus(false);
+    }
+  }
+
+  // ---- Save existing results ----
   async function handleSaveResults(e: FormEvent) {
     e.preventDefault();
     if (!analysis?.results) return;
@@ -141,7 +208,6 @@ export default function AnalysisDetailPage() {
     setResultSuccess('');
     try {
       const resultsToSave = analysis.results.map((r) => ({
-        id: r.id,
         parameterName: r.parameterName,
         unit: r.unit,
         value: resultValues[r.id] ? parseFloat(resultValues[r.id]) : r.value,
@@ -158,6 +224,49 @@ export default function AnalysisDetailPage() {
     } finally {
       setSavingResults(false);
     }
+  }
+
+  // ---- Save new results ----
+  async function handleSaveNewResults(e: FormEvent) {
+    e.preventDefault();
+    const filledRows = newResults.filter((r) => r.parameterName && r.unit && r.value);
+    if (filledRows.length === 0) {
+      setResultError('Uzupełnij przynajmniej jeden wynik (parametr, jednostka, wartość).');
+      return;
+    }
+    setSavingResults(true);
+    setResultError('');
+    setResultSuccess('');
+    try {
+      const resultsToSave = filledRows.map((r) => ({
+        parameterName: r.parameterName,
+        unit: r.unit,
+        value: parseFloat(r.value),
+        minReference: r.minReference ? parseFloat(r.minReference) : undefined,
+        maxReference: r.maxReference ? parseFloat(r.maxReference) : undefined,
+        optimalReference: r.optimalReference ? parseFloat(r.optimalReference) : undefined,
+      }));
+      await analysisService.saveResults(id!, resultsToSave);
+      await fetchAnalysis();
+      setResultSuccess('Wyniki zostały zapisane pomyślnie.');
+      setTimeout(() => setResultSuccess(''), 3000);
+    } catch {
+      setResultError('Nie udało się zapisać wyników. Spróbuj ponownie.');
+    } finally {
+      setSavingResults(false);
+    }
+  }
+
+  function addNewResultRow() {
+    setNewResults([...newResults, emptyRow()]);
+  }
+
+  function updateNewResult(index: number, field: keyof NewResultRow, value: string) {
+    setNewResults((prev) => prev.map((r, i) => i === index ? { ...r, [field]: value } : r));
+  }
+
+  function removeNewResultRow(index: number) {
+    setNewResults((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function handleAddRecommendation(e: FormEvent) {
@@ -268,6 +377,8 @@ export default function AnalysisDetailPage() {
     );
   }
 
+  const statusTransitions = ALLOWED_TRANSITIONS[analysis.status] || [];
+
   return (
     <div className="space-y-6">
       {/* Back button */}
@@ -365,6 +476,41 @@ export default function AnalysisDetailPage() {
 
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2">
+            {/* Workflow status buttons */}
+            {statusTransitions.map((tr) => {
+              const Icon = tr.icon;
+              return (
+                <button
+                  key={tr.status}
+                  onClick={() => handleChangeStatus(tr.status)}
+                  disabled={changingStatus}
+                  className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors ${tr.color}`}
+                >
+                  {changingStatus ? (
+                    <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Icon className="h-4 w-4" />
+                  )}
+                  {tr.label}
+                </button>
+              );
+            })}
+
+            {canApprove && (
+              <button
+                onClick={handleApprove}
+                disabled={approvingAnalysis}
+                className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              >
+                {approvingAnalysis ? (
+                  <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <CheckCircle className="h-4 w-4" />
+                )}
+                Zatwierdź
+              </button>
+            )}
+
             <button
               onClick={handleGenerateReport}
               disabled={generatingReport}
@@ -389,20 +535,6 @@ export default function AnalysisDetailPage() {
               )}
               Wyślij raport
             </button>
-            {canApprove && (
-              <button
-                onClick={handleApprove}
-                disabled={approvingAnalysis}
-                className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-              >
-                {approvingAnalysis ? (
-                  <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <CheckCircle className="h-4 w-4" />
-                )}
-                Zatwierdź
-              </button>
-            )}
           </div>
         </div>
       </div>
@@ -413,7 +545,7 @@ export default function AnalysisDetailPage() {
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Wyniki analizy
           </h2>
-          {isEditable && (
+          {isEditable && hasExistingResults && (
             <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
               <AlertTriangle className="h-3 w-3" />
               Wartości można edytować
@@ -432,11 +564,8 @@ export default function AnalysisDetailPage() {
           </div>
         )}
 
-        {!analysis.results || analysis.results.length === 0 ? (
-          <div className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
-            Brak wyników dla tej analizy.
-          </div>
-        ) : (
+        {hasExistingResults ? (
+          /* Existing results table with inline editing */
           <form onSubmit={handleSaveResults}>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -453,7 +582,7 @@ export default function AnalysisDetailPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {analysis.results.map((result) => (
+                  {analysis.results!.map((result) => (
                     <tr
                       key={result.id}
                       className={`transition-colors ${getRowBgColor(result.deviation)}`}
@@ -528,6 +657,135 @@ export default function AnalysisDetailPage() {
               </div>
             )}
           </form>
+        ) : isEditable ? (
+          /* New results entry form */
+          <form onSubmit={handleSaveNewResults}>
+            <div className="px-6 py-4">
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                {newResults.length > 0
+                  ? 'Parametry zostały wstępnie wypełnione z definicji procesu. Uzupełnij wartości pomiarów i zapisz.'
+                  : 'Brak zdefiniowanych parametrów dla tego procesu. Dodaj parametry ręcznie.'}
+              </p>
+
+              {newResults.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                        <th className="text-left px-3 py-2 font-medium text-gray-700 dark:text-gray-300">Parametr</th>
+                        <th className="text-left px-3 py-2 font-medium text-gray-700 dark:text-gray-300">Jednostka</th>
+                        <th className="text-right px-3 py-2 font-medium text-gray-700 dark:text-gray-300">Wartość *</th>
+                        <th className="text-right px-3 py-2 font-medium text-gray-700 dark:text-gray-300">Min</th>
+                        <th className="text-right px-3 py-2 font-medium text-gray-700 dark:text-gray-300">Max</th>
+                        <th className="text-right px-3 py-2 font-medium text-gray-700 dark:text-gray-300">Optimum</th>
+                        <th className="px-3 py-2 w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {newResults.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-900/30">
+                          <td className="px-3 py-2">
+                            <input
+                              type="text"
+                              value={row.parameterName}
+                              onChange={(e) => updateNewResult(idx, 'parameterName', e.target.value)}
+                              placeholder="Nazwa"
+                              className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="text"
+                              value={row.unit}
+                              onChange={(e) => updateNewResult(idx, 'unit', e.target.value)}
+                              placeholder="g/l"
+                              className="w-20 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              step="any"
+                              value={row.value}
+                              onChange={(e) => updateNewResult(idx, 'value', e.target.value)}
+                              placeholder="0.00"
+                              className="w-24 text-right rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              step="any"
+                              value={row.minReference}
+                              onChange={(e) => updateNewResult(idx, 'minReference', e.target.value)}
+                              className="w-20 text-right rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              step="any"
+                              value={row.maxReference}
+                              onChange={(e) => updateNewResult(idx, 'maxReference', e.target.value)}
+                              className="w-20 text-right rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              step="any"
+                              value={row.optimalReference}
+                              onChange={(e) => updateNewResult(idx, 'optimalReference', e.target.value)}
+                              className="w-20 text-right rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <button
+                              type="button"
+                              onClick={() => removeNewResultRow(idx)}
+                              className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-600 transition-colors"
+                              title="Usuń wiersz"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="mt-3 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={addNewResultRow}
+                  className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  <Plus className="h-4 w-4" />
+                  Dodaj parametr
+                </button>
+                {newResults.length > 0 && (
+                  <button
+                    type="submit"
+                    disabled={savingResults}
+                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {savingResults ? (
+                      <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                    Zapisz wyniki
+                  </button>
+                )}
+              </div>
+            </div>
+          </form>
+        ) : (
+          <div className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            Brak wyników dla tej analizy.
+          </div>
         )}
       </div>
 
