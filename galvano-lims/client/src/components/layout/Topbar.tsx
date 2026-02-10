@@ -14,7 +14,6 @@ import {
   Moon,
   Globe,
   LogOut,
-  Search,
 } from 'lucide-react';
 
 interface TopbarProps {
@@ -108,10 +107,10 @@ export function Topbar({ onMenuClick }: TopbarProps) {
     <header className="sticky top-0 z-30 h-16 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
       <div className="flex items-center justify-between h-full px-4">
         {/* Left */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-1 min-w-0">
           <button
             onClick={onMenuClick}
-            className="lg:hidden p-2 rounded-md hover:bg-accent"
+            className="lg:hidden p-2 rounded-md hover:bg-accent flex-shrink-0"
           >
             <Menu className="h-5 w-5" />
           </button>

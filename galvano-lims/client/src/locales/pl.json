@@ -240,5 +240,13 @@
     "lightMode": "Tryb jasny",
     "language": "Język",
     "print": "Drukuj"
+  },
+  "search": {
+    "placeholder": "Szukaj klienta, próbkę, analizę lub proces...",
+    "noResults": "Brak wyników dla",
+    "clients": "Klienci",
+    "samples": "Próbki",
+    "analyses": "Analizy",
+    "processes": "Procesy"
   }
 }
