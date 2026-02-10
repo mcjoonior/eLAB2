@@ -6,7 +6,7 @@ const router = Router();
 
 router.use(authenticateToken as any);
 
-// GET /api/search?q=...&limit=5
+// GET /api/search?q=... - globalne wyszukiwanie
 router.get('/', globalSearch as any);
 
 export default router;
