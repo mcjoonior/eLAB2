@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
 import { notificationService } from '@/services/adminService';
 import { authService } from '@/services/authService';
+import { GlobalSearchDropdown } from '@/components/common/GlobalSearchDropdown';
 import {
   Menu,
   Bell,
@@ -12,7 +13,6 @@ import {
   Moon,
   Globe,
   LogOut,
-  Search,
 } from 'lucide-react';
 
 interface TopbarProps {
@@ -25,7 +25,6 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   const { user, logout } = useAuthStore();
   const { theme, setTheme } = useThemeStore();
   const [unreadCount, setUnreadCount] = useState(0);
-  const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
@@ -48,39 +47,22 @@ export function Topbar({ onMenuClick }: TopbarProps) {
     i18n.changeLanguage(i18n.language === 'pl' ? 'en' : 'pl');
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-      setSearchQuery('');
-    }
-  };
-
   return (
     <header className="sticky top-0 z-30 h-16 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
       <div className="flex items-center justify-between h-full px-4">
         {/* Left */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-1 min-w-0">
           <button
             onClick={onMenuClick}
-            className="lg:hidden p-2 rounded-md hover:bg-accent"
+            className="lg:hidden p-2 rounded-md hover:bg-accent flex-shrink-0"
           >
             <Menu className="h-5 w-5" />
           </button>
 
-          {/* Search */}
-          <form onSubmit={handleSearch} className="hidden md:flex items-center">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t('common.search')}
-                className="h-9 w-64 pl-9 pr-4 rounded-md border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-          </form>
+          {/* Global Search */}
+          <div className="hidden md:block w-full max-w-md">
+            <GlobalSearchDropdown />
+          </div>
         </div>
 
         {/* Right */}

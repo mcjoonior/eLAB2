@@ -233,5 +233,13 @@
     "lightMode": "Light mode",
     "language": "Language",
     "print": "Print"
+  },
+  "search": {
+    "placeholder": "Search client, sample, analysis or process...",
+    "noResults": "No results for",
+    "clients": "Clients",
+    "samples": "Samples",
+    "analyses": "Analyses",
+    "processes": "Processes"
   }
 }
