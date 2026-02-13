@@ -4,6 +4,7 @@ import {
   getStats,
   getRecentAnalyses,
   getCriticalAlerts,
+  getOverview,
 } from '../controllers/dashboardController';
 
 const router = Router();
@@ -13,6 +14,9 @@ router.use(authenticateToken as any);
 
 // GET /api/dashboard/stats - Statystyki (probki dzis/tydzien/miesiac, analizy, odchylenia)
 router.get('/stats', getStats as any);
+
+// GET /api/dashboard/overview - Kompletny zestaw danych dla dashboardu
+router.get('/overview', getOverview as any);
 
 // GET /api/dashboard/recent-analyses - Ostatnie 10 analiz
 router.get('/recent-analyses', getRecentAnalyses as any);

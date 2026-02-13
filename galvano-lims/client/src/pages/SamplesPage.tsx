@@ -1,12 +1,14 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Plus, Filter, Edit2, ChevronDown, X } from 'lucide-react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Pagination } from '@/components/common/Pagination';
 import { sampleService } from '@/services/sampleService';
+import type { AssignableUser } from '@/services/sampleService';
 import { clientService } from '@/services/clientService';
 import { processService } from '@/services/processService';
+import { useAuthStore } from '@/store/authStore';
 import {
   getSampleStatusColor,
   getSampleStatusLabel,
@@ -34,11 +36,13 @@ const VALID_NEXT_STATUSES: Record<SampleStatus, SampleStatus[]> = {
 export default function SamplesPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
 
   // Data
   const [samples, setSamples] = useState<Sample[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [processes, setProcesses] = useState<Process[]>([]);
+  const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -65,21 +69,26 @@ export default function SamplesPage() {
     sampleType: 'BATH' as SampleType,
     description: '',
     collectedAt: new Date().toISOString().slice(0, 10),
+    assignmentMode: 'self' as 'self' | 'other',
+    assignedUserId: '',
   });
 
   // Status change dropdown
   const [statusDropdownId, setStatusDropdownId] = useState<string | null>(null);
+  const [statusMenuPosition, setStatusMenuPosition] = useState<{ top: number; left: number } | null>(null);
 
   // Fetch reference data
   useEffect(() => {
     async function loadReferenceData() {
       try {
-        const [clientsRes, processesRes] = await Promise.all([
+        const [clientsRes, processesRes, usersRes] = await Promise.all([
           clientService.getAll({ limit: 200, isActive: true }),
           processService.getAll({ limit: 200, isActive: true }),
+          sampleService.getAssignableUsers(),
         ]);
         setClients(clientsRes.data);
         setProcesses(processesRes.data);
+        setAssignableUsers(usersRes);
       } catch {
         // Reference data loading failure is not critical
       }
@@ -121,6 +130,10 @@ export default function SamplesPage() {
       setCreateError('Klient i proces są wymagane.');
       return;
     }
+    if (newSample.assignmentMode === 'other' && !newSample.assignedUserId) {
+      setCreateError('Wybierz użytkownika do przypisania próbki.');
+      return;
+    }
     setCreateLoading(true);
     setCreateError('');
     try {
@@ -130,6 +143,10 @@ export default function SamplesPage() {
         sampleType: newSample.sampleType,
         description: newSample.description || undefined,
         collectedAt: newSample.collectedAt,
+        collectedBy:
+          newSample.assignmentMode === 'other'
+            ? newSample.assignedUserId
+            : user?.id,
       });
       setShowCreateDialog(false);
       setNewSample({
@@ -138,6 +155,8 @@ export default function SamplesPage() {
         sampleType: 'BATH',
         description: '',
         collectedAt: new Date().toISOString().slice(0, 10),
+        assignmentMode: 'self',
+        assignedUserId: '',
       });
       setPage(1);
       fetchSamples();
@@ -150,6 +169,7 @@ export default function SamplesPage() {
 
   async function handleStatusChange(sampleId: string, newStatus: SampleStatus) {
     setStatusDropdownId(null);
+    setStatusMenuPosition(null);
     try {
       await sampleService.changeStatus(sampleId, newStatus);
       fetchSamples();
@@ -165,6 +185,36 @@ export default function SamplesPage() {
     setFilterDateFrom('');
     setFilterDateTo('');
     setPage(1);
+  }
+
+  function toggleStatusMenu(
+    sampleId: string,
+    event: MouseEvent<HTMLButtonElement>,
+    itemCount: number,
+  ) {
+    event.stopPropagation();
+
+    if (statusDropdownId === sampleId) {
+      setStatusDropdownId(null);
+      setStatusMenuPosition(null);
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const menuWidth = 176;
+    const menuHeight = Math.max(44, itemCount * 36 + 8);
+    const margin = 8;
+
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const preferUp = spaceBelow < menuHeight + margin;
+    let top = preferUp ? rect.top - menuHeight - 4 : rect.bottom + 4;
+    top = Math.max(margin, Math.min(top, window.innerHeight - menuHeight - margin));
+
+    let left = rect.right - menuWidth;
+    left = Math.max(margin, Math.min(left, window.innerWidth - menuWidth - margin));
+
+    setStatusDropdownId(sampleId);
+    setStatusMenuPosition({ top, left });
   }
 
   return (
@@ -270,8 +320,8 @@ export default function SamplesPage() {
           <p className="text-gray-500 dark:text-gray-400">{t('samples.noSamples')}</p>
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="overflow-x-auto">
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+          <div className="overflow-x-auto overflow-y-visible">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
@@ -312,10 +362,10 @@ export default function SamplesPage() {
                       {formatDate(sample.collectedAt)}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-2 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => navigate(`/samples/${sample.id}`)}
-                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors"
+                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors whitespace-nowrap"
                         >
                           <Edit2 className="h-3 w-3" />
                           {t('common.edit')}
@@ -323,27 +373,14 @@ export default function SamplesPage() {
                         {VALID_NEXT_STATUSES[sample.status].length > 0 && (
                           <div className="relative">
                             <button
-                              onClick={() => setStatusDropdownId(statusDropdownId === sample.id ? null : sample.id)}
-                              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
+                              onClick={(e) =>
+                                toggleStatusMenu(sample.id, e, VALID_NEXT_STATUSES[sample.status].length)
+                              }
+                              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
                             >
                               {t('samples.changeStatus')}
                               <ChevronDown className="h-3 w-3" />
                             </button>
-                            {statusDropdownId === sample.id && (
-                              <div className="absolute right-0 top-full z-10 mt-1 w-44 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg py-1">
-                                {VALID_NEXT_STATUSES[sample.status].map((nextStatus) => (
-                                  <button
-                                    key={nextStatus}
-                                    onClick={() => handleStatusChange(sample.id, nextStatus)}
-                                    className="block w-full text-left px-3 py-2 text-xs hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                                  >
-                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getSampleStatusColor(nextStatus)}`}>
-                                      {getSampleStatusLabel(nextStatus)}
-                                    </span>
-                                  </button>
-                                ))}
-                              </div>
-                            )}
                           </div>
                         )}
                       </div>
@@ -363,6 +400,41 @@ export default function SamplesPage() {
             />
           </div>
         </div>
+      )}
+
+      {/* Global status dropdown rendered outside table to avoid clipping */}
+      {statusDropdownId && statusMenuPosition && (
+        <>
+          <button
+            type="button"
+            aria-label="close status menu"
+            className="fixed inset-0 z-40 cursor-default bg-transparent"
+            onClick={() => {
+              setStatusDropdownId(null);
+              setStatusMenuPosition(null);
+            }}
+          />
+          <div
+            className="fixed z-50 w-44 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg py-1"
+            style={{ top: `${statusMenuPosition.top}px`, left: `${statusMenuPosition.left}px` }}
+          >
+            {(() => {
+              const sample = samples.find((s) => s.id === statusDropdownId);
+              if (!sample) return null;
+              return VALID_NEXT_STATUSES[sample.status].map((nextStatus) => (
+                <button
+                  key={nextStatus}
+                  onClick={() => handleStatusChange(sample.id, nextStatus)}
+                  className="block w-full text-left px-3 py-2 text-xs hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                >
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getSampleStatusColor(nextStatus)}`}>
+                    {getSampleStatusLabel(nextStatus)}
+                  </span>
+                </button>
+              ));
+            })()}
+          </div>
+        </>
       )}
 
       {/* Create Dialog */}
@@ -426,6 +498,61 @@ export default function SamplesPage() {
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
+              </div>
+
+              {/* Sample Type */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  Przypisanie próbki *
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <input
+                      type="radio"
+                      name="assignmentMode"
+                      checked={newSample.assignmentMode === 'self'}
+                      onChange={() =>
+                        setNewSample({
+                          ...newSample,
+                          assignmentMode: 'self',
+                          assignedUserId: '',
+                        })
+                      }
+                    />
+                    Przypisz do mnie ({user?.firstName} {user?.lastName})
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <input
+                      type="radio"
+                      name="assignmentMode"
+                      checked={newSample.assignmentMode === 'other'}
+                      onChange={() =>
+                        setNewSample({
+                          ...newSample,
+                          assignmentMode: 'other',
+                        })
+                      }
+                    />
+                    Przypisz do innego użytkownika
+                  </label>
+                </div>
+                {newSample.assignmentMode === 'other' && (
+                  <select
+                    value={newSample.assignedUserId}
+                    onChange={(e) => setNewSample({ ...newSample, assignedUserId: e.target.value })}
+                    required
+                    className="mt-2 block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                  >
+                    <option value="">-- Wybierz użytkownika --</option>
+                    {assignableUsers
+                      .filter((u) => u.id !== user?.id)
+                      .map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.firstName} {u.lastName} ({u.email})
+                        </option>
+                      ))}
+                  </select>
+                )}
               </div>
 
               {/* Sample Type */}

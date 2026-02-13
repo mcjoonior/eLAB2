@@ -26,6 +26,7 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
+  const isAdmin = (user?.role || '').toUpperCase() === 'ADMIN';
   const [branding, setBranding] = useState<Branding | null>(null);
 
   useEffect(() => {
@@ -42,7 +43,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { to: '/analyses', icon: Microscope, label: t('nav.analyses') },
     { to: '/archive', icon: Archive, label: t('nav.archive') },
     { to: '/reports', icon: FileText, label: t('nav.reports') },
-    { to: '/import', icon: Upload, label: t('nav.import') },
+    ...(isAdmin ? [{ to: '/import', icon: Upload, label: t('nav.import') }] : []),
   ];
 
   const adminItems = [
@@ -80,7 +81,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               <Beaker className="h-10 w-10 text-primary" />
             )}
             <h1 className="text-sm font-bold text-foreground leading-tight truncate text-center w-full">
-              {branding?.companyName || 'GalvanoTech'}
+              {branding?.companyName || 'eLAB LIMS'}
             </h1>
           </div>
         </div>
@@ -109,7 +110,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
 
           {/* Admin section */}
-          {user?.role === 'ADMIN' && (
+          {isAdmin && (
             <div className="mt-6">
               <p className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 {t('nav.admin')}

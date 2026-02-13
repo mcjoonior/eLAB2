@@ -394,7 +394,7 @@ export const getSettings = async (req: AuthenticatedRequest, res: Response, next
       // Utworz domyslne ustawienia
       settings = await prisma.companySettings.create({
         data: {
-          companyName: 'Laboratorium Galwaniczne',
+          companyName: 'eLAB LIMS',
         },
       });
     }
@@ -433,7 +433,7 @@ export const updateSettings = async (req: AuthenticatedRequest, res: Response, n
     if (!settings) {
       settings = await prisma.companySettings.create({
         data: {
-          companyName: data.companyName ?? 'Laboratorium Galwaniczne',
+          companyName: data.companyName ?? 'eLAB LIMS',
           ...data,
         },
       });
@@ -489,7 +489,7 @@ export const handleUploadLogo = async (req: AuthenticatedRequest, res: Response,
     if (!settings) {
       settings = await prisma.companySettings.create({
         data: {
-          companyName: 'Laboratorium Galwaniczne',
+          companyName: 'eLAB LIMS',
           logoUrl,
         },
       });

@@ -1020,6 +1020,8 @@ async function findOrCreateClient(
         await tx.client.update({
           where: { id: existing.id },
           data: {
+            // Reactivate matched clients so they are visible in active lists after import.
+            isActive: true,
             ...(extraData.address && !existing.address ? { address: extraData.address } : {}),
             ...(extraData.city && !existing.city ? { city: extraData.city } : {}),
             ...(extraData.postalCode && !existing.postalCode ? { postalCode: extraData.postalCode } : {}),

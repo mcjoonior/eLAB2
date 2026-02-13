@@ -1,6 +1,9 @@
 import { Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 import { prisma } from '../index';
 import { AuthenticatedRequest } from '../middleware/auth';
 
@@ -10,11 +13,13 @@ import { AuthenticatedRequest } from '../middleware/auth';
 
 const createAnalysisSchema = z.object({
   sampleId: z.string().uuid('Nieprawidlowy identyfikator probki'),
+  analysisType: z.enum(['CHEMICAL', 'CORROSION_TEST', 'SURFACE_ANALYSIS']).optional().default('CHEMICAL'),
   analysisDate: z.string().datetime().optional().nullable(),
   notes: z.string().optional().nullable(),
 });
 
 const updateAnalysisSchema = z.object({
+  analysisType: z.enum(['CHEMICAL', 'CORROSION_TEST', 'SURFACE_ANALYSIS']).optional(),
   analysisDate: z.string().datetime().optional().nullable(),
   notes: z.string().optional().nullable(),
 });
@@ -232,6 +237,9 @@ export const getAnalysisById = async (req: AuthenticatedRequest, res: Response, 
           orderBy: { generatedAt: 'desc' },
           select: { id: true, reportCode: true, generatedAt: true, sentToClient: true },
         },
+        attachments: {
+          orderBy: { createdAt: 'asc' },
+        },
       },
     });
 
@@ -277,6 +285,7 @@ export const createAnalysis = async (req: AuthenticatedRequest, res: Response, n
         analysisCode,
         sampleId: data.sampleId,
         performedBy: req.user!.userId,
+        analysisType: data.analysisType as any,
         analysisDate: data.analysisDate ? new Date(data.analysisDate) : new Date(),
         notes: data.notes,
         status: 'PENDING',
@@ -743,6 +752,218 @@ export const getRecommendations = async (req: AuthenticatedRequest, res: Respons
     });
 
     res.json(recommendations);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================
+// Multer config for analysis attachments
+// ============================================================
+
+const ATTACHMENTS_DIR = path.join(__dirname, '..', '..', 'uploads', 'attachments');
+fs.mkdirSync(ATTACHMENTS_DIR, { recursive: true });
+
+const attachmentStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, ATTACHMENTS_DIR),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `att_${Date.now()}_${Math.round(Math.random() * 1e6)}${ext}`);
+  },
+});
+
+export const uploadAttachments = multer({
+  storage: attachmentStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB per file
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff', '.tif'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Niedozwolony typ pliku: ${ext}. Dozwolone: ${allowed.join(', ')}`));
+    }
+  },
+});
+
+// ============================================================
+// POST /:id/attachments - Upload zdjec do analizy
+// ============================================================
+
+export const addAttachments = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    const analysis = await prisma.analysis.findUnique({ where: { id } });
+    if (!analysis) {
+      res.status(404).json({ error: 'Analiza nie zostala znaleziona' });
+      return;
+    }
+
+    const files = req.files as Express.Multer.File[];
+    if (!files || files.length === 0) {
+      res.status(400).json({ error: 'Nie przeslano zadnych plikow' });
+      return;
+    }
+
+    const description = (req.body.description as string) || undefined;
+
+    const attachments = await Promise.all(
+      files.map((file) =>
+        prisma.analysisAttachment.create({
+          data: {
+            analysisId: id,
+            filename: file.filename,
+            originalName: file.originalname,
+            mimeType: file.mimetype,
+            fileSize: file.size,
+            description,
+          },
+        })
+      )
+    );
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.userId,
+        action: 'UPLOAD_ATTACHMENT',
+        entityType: 'ANALYSIS',
+        entityId: id,
+        details: { count: attachments.length, filenames: attachments.map((a) => a.originalName) },
+      },
+    });
+
+    res.status(201).json(attachments);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================
+// DELETE /:id/attachments/:attachmentId - Usun zalacznik
+// ============================================================
+
+export const deleteAttachment = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id, attachmentId } = req.params;
+
+    const attachment = await prisma.analysisAttachment.findFirst({
+      where: { id: attachmentId, analysisId: id },
+    });
+
+    if (!attachment) {
+      res.status(404).json({ error: 'Zalacznik nie zostal znaleziony' });
+      return;
+    }
+
+    // Delete file from disk
+    const filePath = path.join(ATTACHMENTS_DIR, attachment.filename);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    await prisma.analysisAttachment.delete({ where: { id: attachmentId } });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.userId,
+        action: 'DELETE_ATTACHMENT',
+        entityType: 'ANALYSIS',
+        entityId: id,
+        details: { filename: attachment.originalName },
+      },
+    });
+
+    res.json({ message: 'Zalacznik zostal usuniety' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================
+// DELETE /:id - Usuniecie analizy (tylko ADMIN)
+// ============================================================
+
+export const deleteAnalysis = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    const existing = await prisma.analysis.findUnique({
+      where: { id },
+      include: {
+        reports: {
+          select: {
+            id: true,
+            pdfPath: true,
+          },
+        },
+        attachments: {
+          select: {
+            filename: true,
+          },
+        },
+      },
+    });
+
+    if (!existing) {
+      res.status(404).json({ error: 'Analiza nie zostala znaleziona' });
+      return;
+    }
+
+    const reportFiles = existing.reports.map((r) => r.pdfPath).filter(Boolean) as string[];
+    const attachmentFiles = existing.attachments.map((a) => a.filename);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.report.deleteMany({ where: { analysisId: id } });
+      await tx.analysis.delete({ where: { id } });
+
+      const remainingAnalyses = await tx.analysis.count({ where: { sampleId: existing.sampleId } });
+      if (remainingAnalyses === 0) {
+        await tx.sample.updateMany({
+          where: { id: existing.sampleId, status: 'IN_PROGRESS' },
+          data: { status: 'REGISTERED' },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          userId: req.user!.userId,
+          action: 'DELETE',
+          entityType: 'ANALYSIS',
+          entityId: existing.id,
+          details: {
+            analysisCode: existing.analysisCode,
+            removedReports: existing.reports.length,
+            removedAttachments: existing.attachments.length,
+          },
+        },
+      });
+    });
+
+    for (const filePath of reportFiles) {
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+        } catch {
+          // Ignore file delete errors.
+        }
+      }
+    }
+
+    for (const filename of attachmentFiles) {
+      const fullPath = path.join(ATTACHMENTS_DIR, filename);
+      if (fs.existsSync(fullPath)) {
+        try {
+          fs.unlinkSync(fullPath);
+        } catch {
+          // Ignore file delete errors.
+        }
+      }
+    }
+
+    res.json({
+      message: `Analiza ${existing.analysisCode} zostala usunieta`,
+    });
   } catch (error) {
     next(error);
   }

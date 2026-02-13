@@ -41,7 +41,9 @@ export default function AdminSettingsPage() {
       const updated = await adminService.updateSettings(settings);
       setSettings(updated);
       setSuccess('Ustawienia zostały zapisane pomyślnie.');
-      setTimeout(() => setSuccess(''), 3000);
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
     } catch { setError('Nie udało się zapisać ustawień.'); }
     finally { setSaving(false); }
   }
@@ -173,17 +175,11 @@ export default function AdminSettingsPage() {
                 </div>
               </div>
 
-              {/* Company name & subtitle */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Company name */}
+              <div className="grid grid-cols-1 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nazwa firmy (w sidebarze)</label>
                   <input type="text" value={settings.companyName || ''} onChange={(e) => updateField('companyName', e.target.value)}
-                    className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Podtytuł (pod nazwą)</label>
-                  <input type="text" value={settings.appSubtitle || ''} onChange={(e) => updateField('appSubtitle', e.target.value)}
-                    placeholder="LIMS"
                     className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none" />
                 </div>
               </div>

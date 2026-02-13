@@ -1,6 +1,14 @@
 import api from './api';
 import type { Sample, PaginatedResponse, SampleStatus } from '@/types';
 
+export interface AssignableUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+}
+
 export const sampleService = {
   async getAll(params?: {
     page?: number; limit?: number; status?: SampleStatus;
@@ -12,6 +20,11 @@ export const sampleService = {
 
   async getById(id: string): Promise<Sample> {
     const response = await api.get(`/samples/${id}`);
+    return response.data;
+  },
+
+  async getAssignableUsers(): Promise<AssignableUser[]> {
+    const response = await api.get('/samples/assignees');
     return response.data;
   },
 

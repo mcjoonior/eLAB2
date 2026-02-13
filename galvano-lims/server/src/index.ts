@@ -80,12 +80,12 @@ app.get('/api/branding', async (_req, res) => {
   try {
     const settings = await prisma.companySettings.findFirst();
     res.json({
-      companyName: settings?.companyName ?? 'Laboratorium Galwaniczne',
+      companyName: settings?.companyName ?? 'eLAB LIMS',
       appSubtitle: (settings as any)?.appSubtitle ?? 'LIMS',
       logoUrl: settings?.logoUrl ?? null,
     });
   } catch {
-    res.json({ companyName: 'Laboratorium Galwaniczne', appSubtitle: 'LIMS', logoUrl: null });
+    res.json({ companyName: 'eLAB LIMS', appSubtitle: 'LIMS', logoUrl: null });
   }
 });
 

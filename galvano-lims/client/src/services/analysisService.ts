@@ -1,5 +1,5 @@
 import api from './api';
-import type { Analysis, AnalysisResult, Recommendation, PaginatedResponse, AnalysisStatus } from '@/types';
+import type { Analysis, AnalysisResult, AnalysisAttachment, Recommendation, PaginatedResponse, AnalysisStatus, AnalysisType } from '@/types';
 
 export const analysisService = {
   async getAll(params?: {
@@ -15,7 +15,7 @@ export const analysisService = {
     return response.data;
   },
 
-  async create(data: { sampleId: string; notes?: string }): Promise<Analysis> {
+  async create(data: { sampleId: string; analysisType?: AnalysisType; notes?: string }): Promise<Analysis> {
     const response = await api.post('/analyses', data);
     return response.data;
   },
@@ -48,5 +48,23 @@ export const analysisService = {
   async getRecommendations(id: string): Promise<Recommendation[]> {
     const response = await api.get(`/analyses/${id}/recommendations`);
     return response.data;
+  },
+
+  async uploadAttachments(id: string, files: File[], description?: string): Promise<AnalysisAttachment[]> {
+    const formData = new FormData();
+    files.forEach((f) => formData.append('files', f));
+    if (description) formData.append('description', description);
+    const response = await api.post(`/analyses/${id}/attachments`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  async deleteAttachment(analysisId: string, attachmentId: string): Promise<void> {
+    await api.delete(`/analyses/${analysisId}/attachments/${attachmentId}`);
+  },
+
+  async delete(id: string): Promise<void> {
+    await api.delete(`/analyses/${id}`);
   },
 };

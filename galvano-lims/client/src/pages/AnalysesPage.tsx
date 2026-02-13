@@ -1,23 +1,29 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, Filter, X } from 'lucide-react';
+import { Plus, Filter, X, Trash2 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Pagination } from '@/components/common/Pagination';
 import { analysisService } from '@/services/analysisService';
 import { sampleService } from '@/services/sampleService';
+import { useAuthStore } from '@/store/authStore';
 import {
   getAnalysisStatusColor,
   getAnalysisStatusLabel,
   formatDate,
 } from '@/utils/helpers';
-import type { Analysis, Sample, AnalysisStatus } from '@/types';
+import { getAnalysisTypeLabel, getAnalysisTypeColor } from '@/utils/helpers';
+import type { Analysis, Sample, AnalysisStatus, AnalysisType } from '@/types';
+
+const ANALYSIS_TYPES: AnalysisType[] = ['CHEMICAL', 'CORROSION_TEST', 'SURFACE_ANALYSIS'];
 
 const ANALYSIS_STATUSES: AnalysisStatus[] = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'APPROVED', 'REJECTED'];
 
 export default function AnalysesPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === 'ADMIN';
 
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,9 +44,10 @@ export default function AnalysesPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [samples, setSamples] = useState<Sample[]>([]);
   const [samplesLoading, setSamplesLoading] = useState(false);
-  const [newAnalysis, setNewAnalysis] = useState({ sampleId: '', notes: '' });
+  const [newAnalysis, setNewAnalysis] = useState({ sampleId: '', analysisType: 'CHEMICAL' as AnalysisType, notes: '' });
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [confirmDeleteAnalysis, setConfirmDeleteAnalysis] = useState<Analysis | null>(null);
 
   useEffect(() => {
     fetchAnalyses();
@@ -70,7 +77,7 @@ export default function AnalysesPage() {
   async function openCreateDialog() {
     setShowCreateDialog(true);
     setCreateError('');
-    setNewAnalysis({ sampleId: '', notes: '' });
+    setNewAnalysis({ sampleId: '', analysisType: 'CHEMICAL', notes: '' });
     setSamplesLoading(true);
     try {
       const res = await sampleService.getAll({ limit: 200, status: 'REGISTERED' });
@@ -93,6 +100,7 @@ export default function AnalysesPage() {
     try {
       await analysisService.create({
         sampleId: newAnalysis.sampleId,
+        analysisType: newAnalysis.analysisType,
         notes: newAnalysis.notes || undefined,
       });
       setShowCreateDialog(false);
@@ -110,6 +118,18 @@ export default function AnalysesPage() {
     setFilterDateFrom('');
     setFilterDateTo('');
     setPage(1);
+  }
+
+  async function handleDeleteAnalysis() {
+    if (!confirmDeleteAnalysis) return;
+    try {
+      await analysisService.delete(confirmDeleteAnalysis.id);
+      setConfirmDeleteAnalysis(null);
+      fetchAnalyses();
+    } catch {
+      setError('Nie udało się usunąć analizy. Spróbuj ponownie.');
+      setConfirmDeleteAnalysis(null);
+    }
   }
 
   const hasFilters = filterStatus || filterDateFrom || filterDateTo;
@@ -199,6 +219,7 @@ export default function AnalysesPage() {
                   <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Próbka</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Klient</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Proces</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Typ</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Status</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Data</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Wykonał</th>
@@ -225,6 +246,11 @@ export default function AnalysesPage() {
                       {analysis.sample?.process?.name || '-'}
                     </td>
                     <td className="px-4 py-3">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${getAnalysisTypeColor(analysis.analysisType)}`}>
+                        {getAnalysisTypeLabel(analysis.analysisType)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getAnalysisStatusColor(analysis.status)}`}>
                         {getAnalysisStatusLabel(analysis.status)}
                       </span>
@@ -238,12 +264,24 @@ export default function AnalysesPage() {
                         : '-'}
                     </td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => navigate(`/analyses/${analysis.id}`)}
-                        className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors"
-                      >
-                        Szczegóły
-                      </button>
+                      <div className="inline-flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => navigate(`/analyses/${analysis.id}`)}
+                          className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors"
+                        >
+                          Szczegóły
+                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => setConfirmDeleteAnalysis(analysis)}
+                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30 transition-colors"
+                            title={t('common.delete')}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            {t('common.delete')}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -258,6 +296,33 @@ export default function AnalysesPage() {
               limit={limit}
               onPageChange={setPage}
             />
+          </div>
+        </div>
+      )}
+
+      {confirmDeleteAnalysis && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              Usuń analizę
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              Czy na pewno chcesz usunąć analizę <strong>{confirmDeleteAnalysis.analysisCode}</strong>?
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setConfirmDeleteAnalysis(null)}
+                className="rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={handleDeleteAnalysis}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
+              >
+                {t('common.delete')}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -307,6 +372,21 @@ export default function AnalysesPage() {
                     ))}
                   </select>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  Typ analizy
+                </label>
+                <select
+                  value={newAnalysis.analysisType}
+                  onChange={(e) => setNewAnalysis({ ...newAnalysis, analysisType: e.target.value as AnalysisType })}
+                  className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                >
+                  {ANALYSIS_TYPES.map((at) => (
+                    <option key={at} value={at}>{getAnalysisTypeLabel(at)}</option>
+                  ))}
+                </select>
               </div>
 
               <div>

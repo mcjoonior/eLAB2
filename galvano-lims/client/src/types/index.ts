@@ -7,6 +7,7 @@ export type ProcessType = 'ZINC' | 'NICKEL' | 'CHROME' | 'COPPER' | 'TIN' | 'GOL
 export type SampleType = 'BATH' | 'RINSE' | 'WASTEWATER' | 'RAW_MATERIAL' | 'OTHER';
 export type SampleStatus = 'REGISTERED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export type AnalysisStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'APPROVED' | 'REJECTED';
+export type AnalysisType = 'CHEMICAL' | 'CORROSION_TEST' | 'SURFACE_ANALYSIS';
 export type Deviation = 'CRITICAL_LOW' | 'BELOW_MIN' | 'WITHIN_RANGE' | 'ABOVE_MAX' | 'CRITICAL_HIGH';
 export type RecommendationType = 'INCREASE' | 'DECREASE' | 'MAINTAIN' | 'URGENT_ACTION';
 export type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -94,6 +95,7 @@ export interface Analysis {
   analysisCode: string;
   sampleId: string;
   performedBy: string;
+  analysisType: AnalysisType;
   analysisDate: string;
   status: AnalysisStatus;
   notes?: string;
@@ -107,6 +109,18 @@ export interface Analysis {
   results?: AnalysisResult[];
   recommendations?: Recommendation[];
   reports?: Report[];
+  attachments?: AnalysisAttachment[];
+}
+
+export interface AnalysisAttachment {
+  id: string;
+  analysisId: string;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  fileSize: number;
+  description?: string;
+  createdAt: string;
 }
 
 export interface AnalysisResult {
@@ -251,6 +265,50 @@ export interface DashboardStats {
   analysesInProgress: number;
   analysesCompleted: number;
   criticalDeviations: number;
+}
+
+export interface DashboardKpis {
+  dueTodayAnalyses: number;
+  dueTodaySamples: number;
+  overdueAnalyses: number;
+  samplesWithoutAnalyses: number;
+  myInProgressAnalyses: number;
+  criticalDeviationAnalyses: number;
+}
+
+export interface DashboardAttentionItem {
+  id: string;
+  type: 'OVERDUE' | 'NO_ANALYSIS';
+  tag: string;
+  message: string;
+  details: string;
+  date: string;
+  link: string;
+}
+
+export interface DashboardRecentAnalysisRow {
+  id: string;
+  analysisCode: string;
+  sampleCode: string;
+  clientName: string;
+  analystName: string;
+  status: AnalysisStatus;
+  deadline: string;
+  date: string;
+  link: string;
+}
+
+export interface DashboardQuickAction {
+  id: string;
+  label: string;
+  link: string;
+}
+
+export interface DashboardOverview {
+  kpis: DashboardKpis;
+  attentionItems: DashboardAttentionItem[];
+  recentAnalyses: DashboardRecentAnalysisRow[];
+  quickActions: DashboardQuickAction[];
 }
 
 export interface TrendDataPoint {

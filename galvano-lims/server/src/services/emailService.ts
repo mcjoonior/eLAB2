@@ -236,7 +236,7 @@ export async function sendReportEmail(params: SendReportEmailParams): Promise<vo
   const transporter = createTransporter(smtpConfig);
 
   const settings = await prisma.companySettings.findFirst();
-  const companyName = settings?.companyName ?? 'Laboratorium Galwaniczne';
+  const companyName = settings?.companyName ?? 'eLAB LIMS';
   const footerText = settings?.reportFooterText;
 
   const html = buildReportEmailHtml({

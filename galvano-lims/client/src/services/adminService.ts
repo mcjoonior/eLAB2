@@ -69,7 +69,7 @@ export const adminService = {
 };
 
 export const notificationService = {
-  async getAll(params?: { page?: number; limit?: number }): Promise<PaginatedResponse<Notification>> {
+  async getAll(params?: { page?: number; limit?: number; isRead?: boolean }): Promise<PaginatedResponse<Notification>> {
     const response = await api.get('/notifications', { params });
     return response.data;
   },
@@ -84,6 +84,6 @@ export const notificationService = {
 
   async getUnreadCount(): Promise<number> {
     const response = await api.get('/notifications/unread-count');
-    return response.data.count;
+    return response.data.unreadCount ?? 0;
   },
 };

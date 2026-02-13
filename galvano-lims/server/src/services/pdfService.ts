@@ -8,9 +8,57 @@ import { prisma } from '../index';
 // ---------------------------------------------------------------------------
 
 const REPORTS_DIR = path.join(__dirname, '..', '..', 'reports');
+const APP_ROOT_DIR = path.join(__dirname, '..', '..');
+const UPLOADS_DIR = path.join(APP_ROOT_DIR, 'uploads');
+const COLORS = {
+  primary: '#1f3a5f',
+  primarySoft: '#eef3f8',
+  text: '#1f2937',
+  muted: '#6b7280',
+  border: '#d1d5db',
+  zebra: '#f8fafc',
+};
 
 function ensureReportsDir(): void {
   fs.mkdirSync(REPORTS_DIR, { recursive: true });
+}
+
+function resolveLogoPath(logoUrl: string | null | undefined): string | null {
+  if (!logoUrl) return null;
+
+  let pathname = logoUrl.trim();
+  if (!pathname) return null;
+
+  if (pathname.startsWith('http://') || pathname.startsWith('https://')) {
+    try {
+      pathname = new URL(pathname).pathname;
+    } catch {
+      return null;
+    }
+  }
+
+  pathname = decodeURIComponent(pathname);
+  const normalizedPosixPath = path.posix.normalize(pathname).replace(/^\/+/, '');
+  if (normalizedPosixPath.includes('..')) {
+    return null;
+  }
+
+  const candidatePaths = [
+    // Expected format in app settings: /uploads/logos/file.ext
+    path.join(APP_ROOT_DIR, normalizedPosixPath),
+    // Support legacy relative path variants in DB
+    path.join(UPLOADS_DIR, normalizedPosixPath.replace(/^uploads\//, '')),
+    path.join(UPLOADS_DIR, 'logos', path.basename(normalizedPosixPath)),
+    path.join(UPLOADS_DIR, path.basename(normalizedPosixPath)),
+  ];
+
+  for (const candidatePath of candidatePaths) {
+    if (fs.existsSync(candidatePath)) {
+      return candidatePath;
+    }
+  }
+
+  return null;
 }
 
 /** Map SampleType enum to Polish label */
@@ -52,6 +100,16 @@ function deviationLabel(deviation: string): string {
     CRITICAL_HIGH: 'Krytycznie wysoki',
   };
   return map[deviation] ?? deviation;
+}
+
+/** Map AnalysisType enum to Polish label */
+function analysisTypeLabel(type: string): string {
+  const map: Record<string, string> = {
+    CHEMICAL: 'Analiza chemiczna',
+    CORROSION_TEST: 'Test korozji (komora solna)',
+    SURFACE_ANALYSIS: 'Analiza powierzchni (mikroskop)',
+  };
+  return map[type] ?? type;
 }
 
 /** Map Priority enum to Polish label */
@@ -155,6 +213,7 @@ interface ReportData {
   };
   analysis: {
     analysisCode: string;
+    analysisType: string;
     analysisDate: Date;
     status: string;
     notes?: string | null;
@@ -162,6 +221,11 @@ interface ReportData {
     approverName?: string | null;
     approvedAt?: Date | null;
   };
+  attachments: Array<{
+    filename: string;
+    originalName: string;
+    description?: string | null;
+  }>;
   results: Array<{
     parameterName: string;
     unit: string;
@@ -201,6 +265,7 @@ export async function generateReportPdf(analysisId: string, reportCode: string):
       approver: true,
       results: { orderBy: { createdAt: 'asc' } },
       recommendations: { orderBy: { priority: 'asc' } },
+      attachments: { orderBy: { createdAt: 'asc' } },
     },
   });
 
@@ -214,7 +279,7 @@ export async function generateReportPdf(analysisId: string, reportCode: string):
     reportCode,
     generatedAt: new Date(),
     company: {
-      companyName: settings?.companyName ?? 'Laboratorium Galwaniczne',
+      companyName: settings?.companyName ?? 'eLAB LIMS',
       address: settings?.address,
       city: settings?.city,
       postalCode: settings?.postalCode,
@@ -249,6 +314,7 @@ export async function generateReportPdf(analysisId: string, reportCode: string):
     },
     analysis: {
       analysisCode: analysis.analysisCode,
+      analysisType: (analysis as any).analysisType ?? 'CHEMICAL',
       analysisDate: analysis.analysisDate,
       status: analysis.status,
       notes: analysis.notes,
@@ -258,6 +324,11 @@ export async function generateReportPdf(analysisId: string, reportCode: string):
         : undefined,
       approvedAt: analysis.approvedAt ?? undefined,
     },
+    attachments: ((analysis as any).attachments ?? []).map((a: any) => ({
+      filename: a.filename,
+      originalName: a.originalName,
+      description: a.description,
+    })),
     results: analysis.results.map((r) => ({
       parameterName: r.parameterName,
       unit: r.unit,
@@ -309,10 +380,12 @@ export async function generateReportPdf(analysisId: string, reportCode: string):
 
     // Company logo placeholder
     if (data.company.logoUrl) {
-      const logoPath = path.join(__dirname, '..', '..', 'uploads', path.basename(data.company.logoUrl));
-      if (fs.existsSync(logoPath)) {
+      const logoPath = resolveLogoPath(data.company.logoUrl);
+      if (logoPath) {
         try {
-          doc.image(logoPath, doc.page.margins.left, headerTop, { width: 80, height: 80 });
+          doc.image(logoPath, doc.page.margins.left, headerTop, {
+            fit: [80, 80],
+          });
         } catch {
           // If image fails, draw a placeholder rectangle
           doc.rect(doc.page.margins.left, headerTop, 80, 80).stroke('#cccccc');
@@ -330,12 +403,12 @@ export async function generateReportPdf(analysisId: string, reportCode: string):
 
     // Company name and address (right of logo)
     const companyX = doc.page.margins.left + 95;
-    doc.fontSize(16).fillColor('#2c3e50').text(data.company.companyName, companyX, headerTop, {
+    doc.font('DejaVu-Bold').fontSize(16).fillColor(COLORS.primary).text(data.company.companyName, companyX, headerTop, {
       width: pageWidth - 95,
     });
 
     let companyY = doc.y + 2;
-    doc.fontSize(8).fillColor('#7f8c8d');
+    doc.font('DejaVu').fontSize(8).fillColor(COLORS.muted);
     if (data.company.address) {
       doc.text(
         `${data.company.address}${data.company.postalCode ? ', ' + data.company.postalCode : ''} ${data.company.city ?? ''}`.trim(),
@@ -358,18 +431,39 @@ export async function generateReportPdf(analysisId: string, reportCode: string):
 
     // Horizontal line below header
     const lineY = Math.max(doc.y, headerTop + 85) + 10;
-    doc.moveTo(doc.page.margins.left, lineY).lineTo(doc.page.margins.left + pageWidth, lineY).stroke('#2c3e50');
+    doc.moveTo(doc.page.margins.left, lineY).lineTo(doc.page.margins.left + pageWidth, lineY).stroke(COLORS.primary);
 
     // ================================================================
     // REPORT TITLE
     // ================================================================
-    doc.y = lineY + 15;
+    doc.y = lineY + 14;
+    const titleBoxY = doc.y;
     const headerText = data.company.reportHeaderText ?? 'Raport z analizy laboratoryjnej';
-    doc.fontSize(18).fillColor('#2c3e50').text(headerText, { align: 'center' });
-    doc.moveDown(0.3);
-    doc.fontSize(11).fillColor('#34495e').text(`Numer raportu: ${data.reportCode}`, { align: 'center' });
-    doc.fontSize(9).fillColor('#7f8c8d').text(`Data wygenerowania: ${formatDateTime(data.generatedAt)}`, { align: 'center' });
-    doc.moveDown(1);
+    const titleLineHeight = 16;
+    const titlePaddingTop = 10;
+    const titlePaddingBottom = 8;
+    const metaGap = 4;
+    const metaText = `Numer raportu: ${data.reportCode}    |    Data wygenerowania: ${formatDateTime(data.generatedAt)}`;
+
+    doc.font('DejaVu-Bold').fontSize(titleLineHeight);
+    const titleTextHeight = doc.heightOfString(headerText, { width: pageWidth - 24, align: 'center' });
+    doc.font('DejaVu').fontSize(9);
+    const metaTextHeight = doc.heightOfString(metaText, { width: pageWidth - 24, align: 'center' });
+    const titleBoxHeight = Math.ceil(titlePaddingTop + titleTextHeight + metaGap + metaTextHeight + titlePaddingBottom);
+
+    doc.roundedRect(doc.page.margins.left, titleBoxY, pageWidth, titleBoxHeight, 6).fill(COLORS.primarySoft);
+    doc.y = titleBoxY + titlePaddingTop;
+
+    doc.font('DejaVu-Bold').fontSize(titleLineHeight).fillColor(COLORS.primary).text(headerText, doc.page.margins.left + 12, doc.y, {
+      width: pageWidth - 24,
+      align: 'center',
+    });
+    doc.y += metaGap;
+    doc.font('DejaVu').fontSize(9).fillColor(COLORS.muted).text(metaText, doc.page.margins.left + 12, doc.y, {
+      width: pageWidth - 24,
+      align: 'center',
+    });
+    doc.y = titleBoxY + titleBoxHeight + 10;
 
     // ================================================================
     // CLIENT INFORMATION
@@ -418,6 +512,7 @@ export async function generateReportPdf(analysisId: string, reportCode: string):
     ];
     const processInfoRight: [string, string][] = [
       ['Kod analizy:', data.analysis.analysisCode],
+      ['Typ analizy:', analysisTypeLabel(data.analysis.analysisType)],
       ['Data analizy:', formatDate(data.analysis.analysisDate)],
     ];
 
@@ -439,35 +534,34 @@ export async function generateReportPdf(analysisId: string, reportCode: string):
 
     // Table column definitions
     const colDefs = [
-      { header: 'Parametr', width: pageWidth * 0.24 },
-      { header: 'Jednostka', width: pageWidth * 0.10 },
-      { header: 'Wartosc', width: pageWidth * 0.11 },
+      { header: 'Parametr', width: pageWidth * 0.26 },
+      { header: 'J.', width: pageWidth * 0.07 },
+      { header: 'Wynik', width: pageWidth * 0.11 },
       { header: 'Min', width: pageWidth * 0.09 },
       { header: 'Max', width: pageWidth * 0.09 },
-      { header: 'Optimum', width: pageWidth * 0.10 },
-      { header: 'Odchylenie', width: pageWidth * 0.27 },
+      { header: 'Opt.', width: pageWidth * 0.10 },
+      { header: 'Ocena', width: pageWidth * 0.28 },
     ];
 
     const tableLeft = doc.page.margins.left;
-    const rowHeight = 20;
-    const headerRowHeight = 22;
+    const baseRowHeight = 20;
+    const headerRowHeight = 24;
     const tableFontSize = 8;
     const headerFontSize = 8;
 
-    // Check if we need a new page for the table
-    const estimatedTableHeight = headerRowHeight + data.results.length * rowHeight + 20;
-    if (doc.y + estimatedTableHeight > doc.page.height - doc.page.margins.bottom - 80) {
+    if (doc.y + 80 > doc.page.height - doc.page.margins.bottom - 80) {
       doc.addPage();
     }
 
     // Draw table header
     let tableY = doc.y;
-    doc.rect(tableLeft, tableY, pageWidth, headerRowHeight).fill('#2c3e50');
+    const tableStartY = tableY;
+    doc.rect(tableLeft, tableY, pageWidth, headerRowHeight).fill(COLORS.primary);
 
     let colX = tableLeft;
-    doc.fontSize(headerFontSize).fillColor('#ffffff');
+    doc.font('DejaVu-Bold').fontSize(headerFontSize).fillColor('#ffffff');
     for (const col of colDefs) {
-      doc.text(col.header, colX + 4, tableY + 6, { width: col.width - 8, align: 'left' });
+      doc.text(col.header, colX + 4, tableY + 7, { width: col.width - 8, align: 'left' });
       colX += col.width;
     }
 
@@ -477,94 +571,98 @@ export async function generateReportPdf(analysisId: string, reportCode: string):
     for (let i = 0; i < data.results.length; i++) {
       const result = data.results[i];
 
+      const deviationText = deviationLabel(result.deviation);
+      doc.font('DejaVu').fontSize(tableFontSize);
+      const paramHeight = doc.heightOfString(result.parameterName, { width: colDefs[0].width - 8 });
+      const deviationHeight = doc.heightOfString(deviationText, { width: colDefs[6].width - 8 });
+      const rowHeight = Math.max(baseRowHeight, Math.ceil(Math.max(paramHeight, deviationHeight) + 8));
+
       // Check if we need a new page
       if (tableY + rowHeight > doc.page.height - doc.page.margins.bottom - 40) {
         doc.addPage();
         tableY = doc.y;
 
         // Redraw header on new page
-        doc.rect(tableLeft, tableY, pageWidth, headerRowHeight).fill('#2c3e50');
+        doc.rect(tableLeft, tableY, pageWidth, headerRowHeight).fill(COLORS.primary);
         colX = tableLeft;
-        doc.fontSize(headerFontSize).fillColor('#ffffff');
+        doc.font('DejaVu-Bold').fontSize(headerFontSize).fillColor('#ffffff');
         for (const col of colDefs) {
-          doc.text(col.header, colX + 4, tableY + 6, { width: col.width - 8, align: 'left' });
+          doc.text(col.header, colX + 4, tableY + 7, { width: col.width - 8, align: 'left' });
           colX += col.width;
         }
         tableY += headerRowHeight;
       }
 
       // Alternate row background
-      const bgColor = i % 2 === 0 ? '#f8f9fa' : '#ffffff';
+      const bgColor = i % 2 === 0 ? COLORS.zebra : '#ffffff';
       doc.rect(tableLeft, tableY, pageWidth, rowHeight).fill(bgColor);
 
       // Draw cell values
       colX = tableLeft;
-      doc.fontSize(tableFontSize);
+      doc.font('DejaVu').fontSize(tableFontSize);
 
       // Parameter name
-      doc.fillColor('#2c3e50').text(result.parameterName, colX + 4, tableY + 5, {
+      doc.fillColor(COLORS.text).text(result.parameterName, colX + 4, tableY + 4, {
         width: colDefs[0].width - 8,
-        lineBreak: false,
       });
       colX += colDefs[0].width;
 
       // Unit
-      doc.fillColor('#2c3e50').text(result.unit, colX + 4, tableY + 5, {
+      doc.fillColor(COLORS.text).text(result.unit, colX + 4, tableY + 4, {
         width: colDefs[1].width - 8,
-        lineBreak: false,
+        align: 'center',
       });
       colX += colDefs[1].width;
 
       // Value - colored by deviation
       const valColor = deviationColor(result.deviation);
-      doc.fillColor(valColor).text(fmtVal(result.value), colX + 4, tableY + 5, {
+      doc.font('DejaVu-Bold').fillColor(valColor).text(fmtVal(result.value), colX + 4, tableY + 4, {
         width: colDefs[2].width - 8,
-        lineBreak: false,
+        align: 'center',
       });
+      doc.font('DejaVu');
       colX += colDefs[2].width;
 
       // Min
-      doc.fillColor('#2c3e50').text(fmtVal(result.minReference), colX + 4, tableY + 5, {
+      doc.fillColor(COLORS.text).text(fmtVal(result.minReference), colX + 4, tableY + 4, {
         width: colDefs[3].width - 8,
-        lineBreak: false,
+        align: 'center',
       });
       colX += colDefs[3].width;
 
       // Max
-      doc.fillColor('#2c3e50').text(fmtVal(result.maxReference), colX + 4, tableY + 5, {
+      doc.fillColor(COLORS.text).text(fmtVal(result.maxReference), colX + 4, tableY + 4, {
         width: colDefs[4].width - 8,
-        lineBreak: false,
+        align: 'center',
       });
       colX += colDefs[4].width;
 
       // Optimal
-      doc.fillColor('#2c3e50').text(fmtVal(result.optimalReference), colX + 4, tableY + 5, {
+      doc.fillColor(COLORS.text).text(fmtVal(result.optimalReference), colX + 4, tableY + 4, {
         width: colDefs[5].width - 8,
-        lineBreak: false,
+        align: 'center',
       });
       colX += colDefs[5].width;
 
       // Deviation label - colored
-      doc.fillColor(valColor).text(deviationLabel(result.deviation), colX + 4, tableY + 5, {
+      doc.fillColor(valColor).text(deviationText, colX + 4, tableY + 4, {
         width: colDefs[6].width - 8,
-        lineBreak: false,
       });
 
       // Row border
-      doc.moveTo(tableLeft, tableY + rowHeight).lineTo(tableLeft + pageWidth, tableY + rowHeight).stroke('#dee2e6');
+      doc.moveTo(tableLeft, tableY + rowHeight).lineTo(tableLeft + pageWidth, tableY + rowHeight).stroke(COLORS.border);
 
       tableY += rowHeight;
     }
 
     // Table outer border
-    const tableTop = tableY - data.results.length * rowHeight - headerRowHeight;
-    doc.rect(tableLeft, tableTop, pageWidth, tableY - tableTop).stroke('#dee2e6');
+    doc.rect(tableLeft, tableStartY, pageWidth, tableY - tableStartY).stroke(COLORS.border);
 
     doc.y = tableY + 5;
 
     // Legend
     doc.moveDown(0.3);
-    doc.fontSize(7).fillColor('#7f8c8d');
+    doc.font('DejaVu').fontSize(7).fillColor(COLORS.muted);
     const legendItems = [
       { color: '#27ae60', label: 'W normie' },
       { color: '#f39c12', label: 'Ponizej min / Powyzej max' },
@@ -574,7 +672,7 @@ export async function generateReportPdf(analysisId: string, reportCode: string):
     const legendY = doc.y;
     for (const item of legendItems) {
       doc.rect(legendX, legendY, 8, 8).fill(item.color);
-      doc.fillColor('#7f8c8d').text(item.label, legendX + 12, legendY, { lineBreak: false });
+      doc.fillColor(COLORS.muted).text(item.label, legendX + 12, legendY, { lineBreak: false });
       legendX += 130;
     }
     doc.y = legendY + 15;
@@ -632,6 +730,55 @@ export async function generateReportPdf(analysisId: string, reportCode: string):
         width: pageWidth,
       });
       doc.moveDown(0.5);
+    }
+
+    // ================================================================
+    // ATTACHMENTS (images)
+    // ================================================================
+    if (data.attachments.length > 0) {
+      if (doc.y + 60 > doc.page.height - doc.page.margins.bottom - 80) {
+        doc.addPage();
+      }
+
+      drawSectionHeader(doc, 'Załączniki fotograficzne', pageWidth);
+      doc.moveDown(0.3);
+
+      const ATTACHMENTS_DIR = path.join(__dirname, '..', '..', 'uploads', 'attachments');
+      const imgMaxWidth = pageWidth * 0.8;
+      const imgMaxHeight = 300;
+
+      for (const att of data.attachments) {
+        const imgPath = path.join(ATTACHMENTS_DIR, att.filename);
+        if (!fs.existsSync(imgPath)) continue;
+
+        // Check if we need a new page (allow space for image + caption)
+        if (doc.y + imgMaxHeight + 30 > doc.page.height - doc.page.margins.bottom - 40) {
+          doc.addPage();
+        }
+
+        try {
+          doc.image(imgPath, doc.page.margins.left + (pageWidth - imgMaxWidth) / 2, doc.y, {
+            fit: [imgMaxWidth, imgMaxHeight],
+            align: 'center',
+          });
+
+          // Move below the image
+          doc.moveDown(0.5);
+
+          // Caption
+          const caption = att.description || att.originalName;
+          doc.fontSize(8).fillColor('#7f8c8d').text(caption, {
+            width: pageWidth,
+            align: 'center',
+          });
+          doc.moveDown(1);
+        } catch {
+          doc.fontSize(8).fillColor('#999999').text(`[Nie można załadować: ${att.originalName}]`, {
+            width: pageWidth,
+          });
+          doc.moveDown(0.5);
+        }
+      }
     }
 
     // ================================================================
@@ -713,11 +860,11 @@ export async function generateReportPdf(analysisId: string, reportCode: string):
 
 function drawSectionHeader(doc: PDFKit.PDFDocument, title: string, pageWidth: number): void {
   const y = doc.y;
-  doc.rect(doc.page.margins.left, y, 4, 16).fill('#2c3e50');
-  doc.fontSize(12).fillColor('#2c3e50').text(title, doc.page.margins.left + 12, y + 1, {
-    width: pageWidth - 12,
+  doc.roundedRect(doc.page.margins.left, y, pageWidth, 20, 5).fill(COLORS.primarySoft);
+  doc.font('DejaVu-Bold').fontSize(11).fillColor(COLORS.primary).text(title, doc.page.margins.left + 10, y + 5, {
+    width: pageWidth - 20,
   });
-  doc.moveDown(0.2);
+  doc.y = y + 24;
 }
 
 function drawTwoColumnInfo(
@@ -726,27 +873,46 @@ function drawTwoColumnInfo(
   rightItems: [string, string][],
   pageWidth: number,
 ): void {
-  const colWidth = pageWidth / 2;
+  const gutter = 12;
+  const colWidth = (pageWidth - gutter) / 2;
   const startY = doc.y;
   const leftX = doc.page.margins.left;
-  const rightX = doc.page.margins.left + colWidth;
+  const rightX = doc.page.margins.left + colWidth + gutter;
   let yOffset = 0;
+
+  const getItemHeight = (item: [string, string] | undefined): number => {
+    if (!item) return 0;
+    const innerWidth = colWidth - 12;
+    doc.font('DejaVu-Bold').fontSize(7);
+    const labelH = doc.heightOfString(item[0], { width: innerWidth });
+    doc.font('DejaVu').fontSize(9);
+    const valueH = doc.heightOfString(item[1], { width: innerWidth });
+    return Math.max(30, Math.ceil(labelH + valueH + 12));
+  };
+
+  const drawInfoBox = (item: [string, string] | undefined, x: number, y: number, boxHeight: number): void => {
+    doc.roundedRect(x, y, colWidth, boxHeight, 4).fillAndStroke('#ffffff', COLORS.border);
+    if (!item) return;
+
+    doc.font('DejaVu-Bold').fontSize(7).fillColor(COLORS.muted).text(item[0], x + 6, y + 5, {
+      width: colWidth - 12,
+    });
+    doc.font('DejaVu').fontSize(9).fillColor(COLORS.text).text(item[1], x + 6, y + 14, {
+      width: colWidth - 12,
+    });
+  };
 
   const maxRows = Math.max(leftItems.length, rightItems.length);
   for (let i = 0; i < maxRows; i++) {
     const y = startY + yOffset;
+    const leftItem = leftItems[i];
+    const rightItem = rightItems[i];
+    const rowHeight = Math.max(getItemHeight(leftItem), getItemHeight(rightItem));
 
-    if (i < leftItems.length) {
-      doc.fontSize(8).fillColor('#7f8c8d').text(leftItems[i][0], leftX, y, { continued: true, width: colWidth });
-      doc.fillColor('#2c3e50').text(` ${leftItems[i][1]}`, { width: colWidth });
-    }
+    drawInfoBox(leftItem, leftX, y, rowHeight);
+    drawInfoBox(rightItem, rightX, y, rowHeight);
 
-    if (i < rightItems.length) {
-      doc.fontSize(8).fillColor('#7f8c8d').text(rightItems[i][0], rightX, y, { continued: true, width: colWidth });
-      doc.fillColor('#2c3e50').text(` ${rightItems[i][1]}`, { width: colWidth });
-    }
-
-    yOffset += 14;
+    yOffset += rowHeight + 8;
   }
 
   doc.y = startY + yOffset;

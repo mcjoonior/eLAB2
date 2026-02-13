@@ -1,11 +1,12 @@
 import { Router } from 'express';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, authorizeRoles } from '../middleware/auth';
 import {
   getReports,
   getReportById,
   generateReport,
   downloadReport,
   sendReportByEmail,
+  deleteReport,
 } from '../controllers/reportController';
 
 const router = Router();
@@ -27,5 +28,6 @@ router.get('/:id/download', downloadReport as any);
 
 // POST /api/reports/:id/send-email - Wyslanie raportu emailem
 router.post('/:id/send-email', sendReportByEmail as any);
+router.delete('/:id', authorizeRoles('ADMIN') as any, deleteReport as any);
 
 export default router;

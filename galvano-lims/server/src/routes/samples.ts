@@ -6,6 +6,7 @@ import {
   createSample,
   updateSample,
   changeSampleStatus,
+  getAssignableUsers,
 } from '../controllers/sampleController';
 
 const router = Router();
@@ -15,6 +16,9 @@ router.use(authenticateToken as any);
 
 // GET /api/samples - Lista probek z filtrami i paginacja
 router.get('/', getSamples as any);
+
+// GET /api/samples/assignees - Lista aktywnych użytkowników do przypisania próbki
+router.get('/assignees', getAssignableUsers as any);
 
 // GET /api/samples/:id - Szczegoly probki z klientem, procesem i analizami
 router.get('/:id', getSampleById as any);

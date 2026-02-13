@@ -10,6 +10,10 @@ import {
   saveAnalysisResults,
   addRecommendation,
   getRecommendations,
+  uploadAttachments,
+  addAttachments,
+  deleteAttachment,
+  deleteAnalysis,
 } from '../controllers/analysisController';
 
 const router = Router();
@@ -43,5 +47,12 @@ router.post('/:id/recommendations', addRecommendation as any);
 
 // GET /api/analyses/:id/recommendations - Pobranie zalecen analizy
 router.get('/:id/recommendations', getRecommendations as any);
+
+// POST /api/analyses/:id/attachments - Upload zdjec do analizy
+router.post('/:id/attachments', uploadAttachments.array('files', 10) as any, addAttachments as any);
+
+// DELETE /api/analyses/:id/attachments/:attachmentId - Usun zalacznik
+router.delete('/:id/attachments/:attachmentId', deleteAttachment as any);
+router.delete('/:id', authorizeRoles('ADMIN') as any, deleteAnalysis as any);
 
 export default router;

@@ -5,6 +5,7 @@ import { Plus, Search, Download, Pencil, XCircle, X } from 'lucide-react';
 import { clientService } from '@/services/clientService';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Pagination } from '@/components/common/Pagination';
+import { useAuthStore } from '@/store/authStore';
 import { formatDate, downloadCSV } from '@/utils/helpers';
 import type { Client } from '@/types';
 
@@ -37,11 +38,14 @@ const emptyForm: ClientForm = {
 export default function ClientsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = (user?.role || '').toUpperCase() === 'ADMIN';
 
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [activityFilter, setActivityFilter] = useState<'active' | 'inactive' | 'all'>('active');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -56,12 +60,24 @@ export default function ClientsPage() {
 
   // Confirm deactivate
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [confirmPermanentDelete, setConfirmPermanentDelete] = useState<Client | null>(null);
 
   async function fetchClients() {
     setLoading(true);
     setError('');
     try {
-      const res = await clientService.getAll({ page, limit, search: search || undefined });
+      const isActive =
+        activityFilter === 'active'
+          ? true
+          : activityFilter === 'inactive'
+            ? false
+            : 'all';
+      const res = await clientService.getAll({
+        page,
+        limit,
+        search: search || undefined,
+        isActive,
+      });
       setClients(res.data);
       setTotalPages(res.pagination.totalPages);
       setTotal(res.pagination.total);
@@ -84,7 +100,7 @@ export default function ClientsPage() {
     }, 300);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
+  }, [search, activityFilter]);
 
   function openAdd() {
     setEditingClient(null);
@@ -145,6 +161,19 @@ export default function ClientsPage() {
     }
   }
 
+  async function handlePermanentDelete() {
+    if (!confirmPermanentDelete) return;
+    try {
+      await clientService.deletePermanent(confirmPermanentDelete.id);
+      setConfirmPermanentDelete(null);
+      fetchClients();
+    } catch (err: any) {
+      const message = err?.response?.data?.error as string | undefined;
+      setError(message || t('common.errorOccurred'));
+      setConfirmPermanentDelete(null);
+    }
+  }
+
   async function handleExportCSV() {
     try {
       const csv = await clientService.exportCSV();
@@ -183,16 +212,27 @@ export default function ClientsPage() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={t('clients.search')}
-          className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 pl-10 pr-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-colors"
-        />
+      {/* Search & activity filter */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+        <div className="relative max-w-md w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('clients.search')}
+            className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 pl-10 pr-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-colors"
+          />
+        </div>
+        <select
+          value={activityFilter}
+          onChange={(e) => setActivityFilter(e.target.value as 'active' | 'inactive' | 'all')}
+          className="w-full sm:w-52 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-colors"
+        >
+          <option value="active">{t('common.active')}</option>
+          <option value="inactive">{t('common.inactive')}</option>
+          <option value="all">{t('common.all')}</option>
+        </select>
       </div>
 
       {/* Error */}
@@ -272,13 +312,23 @@ export default function ClientsPage() {
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
-                          <button
-                            onClick={() => setConfirmId(client.id)}
-                            className="p-1.5 rounded-md text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                            title={t('admin.deactivate')}
-                          >
-                            <XCircle className="h-4 w-4" />
-                          </button>
+                          {isAdmin && (
+                            <button
+                              onClick={() => setConfirmId(client.id)}
+                              className="p-1.5 rounded-md text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                              title={t('admin.deactivate')}
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </button>
+                          )}
+                          {isAdmin && (
+                            <button
+                              onClick={() => setConfirmPermanentDelete(client)}
+                              className="inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                            >
+                              {t('clients.deletePermanent')}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -299,7 +349,7 @@ export default function ClientsPage() {
       )}
 
       {/* Confirm deactivate dialog */}
-      {confirmId && (
+      {confirmId && isAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-6 max-w-sm w-full mx-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
@@ -320,6 +370,34 @@ export default function ClientsPage() {
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
               >
                 {t('admin.deactivate')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm permanent delete dialog */}
+      {confirmPermanentDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              {t('clients.deletePermanent')}
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              {t('clients.confirmPermanentDelete', { name: confirmPermanentDelete.companyName })}
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setConfirmPermanentDelete(null)}
+                className="rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={handlePermanentDelete}
+                className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 transition-colors"
+              >
+                {t('clients.deletePermanent')}
               </button>
             </div>
           </div>

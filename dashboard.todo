@@ -1,0 +1,14 @@
+- [ ] Ułożyć centralny dashboard w 3 sekcje: KPI, "Wymaga uwagi + Szybkie akcje", "Ostatnie analizy".
+- [ ] Dodać 5 kafelków KPI w stylu makiety: Do wykonania dziś, Po terminie, Próbki bez analiz, Moje analizy w toku, Odchylenia krytyczne.
+- [ ] W KPI "Do wykonania dziś" pokazać dwa liczniki: analizy i próbki.
+- [ ] Dodać blok "Wymaga uwagi" z tagami typów zdarzeń i linkiem "Zobacz wszystkie".
+- [ ] Dodać blok "Szybkie akcje" po prawej stronie (desktop) i pod blokiem uwagi (mobile).
+- [ ] Rozbudować tabelę "Ostatnie analizy" o kolumny: analityk, termin, data.
+- [ ] Dodać nowy endpoint backendu `GET /api/dashboard/overview` zwracający komplet danych dla nowego układu.
+- [ ] Ustalić i zaimplementować reguły metryk: "po terminie" i "do wykonania dziś" na bazie `analysisDate` + status.
+- [ ] Dodać typy frontendowe dla danych overview (`DashboardOverview`, `DashboardAttentionItem`).
+- [ ] Podpiąć nowy dashboard do `dashboardService.getOverview()`.
+- [ ] Zachować istniejący left bar i top bar bez zmian.
+- [ ] Dodać klucze tłumaczeń PL/EN dla nowych etykiet dashboardu.
+- [ ] Zapewnić responsywność zgodną z makietą (desktop/tablet/mobile).
+- [ ] Zweryfikować działanie po przebudowie i restarcie kontenerów.

@@ -128,7 +128,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="mt-6 text-center text-xs text-gray-400 dark:text-gray-500">
-          &copy; {new Date().getFullYear()} GalvanoTech LIMS
+          &copy; {new Date().getFullYear()} {t('app.name')}
         </p>
       </div>
     </div>

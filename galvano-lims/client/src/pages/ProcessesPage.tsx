@@ -5,6 +5,7 @@ import { Plus, Filter, Edit2, Copy, XCircle, X, Trash2 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Pagination } from '@/components/common/Pagination';
 import { processService } from '@/services/processService';
+import { useAuthStore } from '@/store/authStore';
 import { getProcessTypeLabel } from '@/utils/helpers';
 import type { Process, ProcessParameter, ProcessType } from '@/types';
 
@@ -50,6 +51,8 @@ const emptyParameter: ParameterRow = {
 export default function ProcessesPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === 'ADMIN';
 
   const [processes, setProcesses] = useState<Process[]>([]);
   const [loading, setLoading] = useState(true);
@@ -333,14 +336,16 @@ export default function ProcessesPage() {
                           <Copy className="h-3 w-3" />
                           Klonuj
                         </button>
-                        <button
-                          onClick={() => setDeactivateId(process.id)}
-                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30 transition-colors"
-                          title="Dezaktywuj"
-                        >
-                          <XCircle className="h-3 w-3" />
-                          Dezaktywuj
-                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => setDeactivateId(process.id)}
+                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30 transition-colors"
+                            title={t('common.delete')}
+                          >
+                            <XCircle className="h-3 w-3" />
+                            {t('common.delete')}
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -408,14 +413,14 @@ export default function ProcessesPage() {
       )}
 
       {/* Deactivate Confirm Dialog */}
-      {deactivateId && (
+      {deactivateId && isAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-6 max-w-sm w-full mx-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              Dezaktywacja procesu
+              Usunięcie procesu
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              Czy na pewno chcesz dezaktywować ten proces? Operacja jest nieodwracalna.
+              Czy na pewno chcesz usunąć ten proces? Operacja jest nieodwracalna.
             </p>
             <div className="flex items-center justify-end gap-3">
               <button
@@ -428,7 +433,7 @@ export default function ProcessesPage() {
                 onClick={() => handleDeactivate(deactivateId)}
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
               >
-                Dezaktywuj
+                {t('common.delete')}
               </button>
             </div>
           </div>

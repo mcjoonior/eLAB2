@@ -23,6 +23,10 @@ export const reportService = {
   },
 
   async sendEmail(id: string, email?: string): Promise<void> {
-    await api.post(`/reports/${id}/send-email`, { email });
+    await api.post(`/reports/${id}/send-email`, { recipientEmail: email });
+  },
+
+  async delete(id: string): Promise<void> {
+    await api.delete(`/reports/${id}`);
   },
 };

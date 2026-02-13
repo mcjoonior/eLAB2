@@ -31,7 +31,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((s) => s.user);
-  if (user?.role !== 'ADMIN') return <Navigate to="/" replace />;
+  if ((user?.role || '').toUpperCase() !== 'ADMIN') return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
@@ -71,7 +71,7 @@ export default function App() {
           <Route path="analyses/:id" element={<AnalysisDetailPage />} />
           <Route path="archive" element={<ArchivePage />} />
           <Route path="reports" element={<ReportsPage />} />
-          <Route path="import" element={<ImportPage />} />
+          <Route path="import" element={<AdminRoute><ImportPage /></AdminRoute>} />
           <Route path="admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
           <Route path="admin/settings" element={<AdminRoute><AdminSettingsPage /></AdminRoute>} />
           <Route path="admin/audit-log" element={<AdminRoute><AuditLogPage /></AdminRoute>} />

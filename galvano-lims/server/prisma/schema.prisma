@@ -68,6 +68,12 @@ enum RecommendationType {
   URGENT_ACTION
 }
 
+enum AnalysisType {
+  CHEMICAL
+  CORROSION_TEST
+  SURFACE_ANALYSIS
+}
+
 enum Priority {
   LOW
   MEDIUM
@@ -210,6 +216,7 @@ model Analysis {
   performedBy  String
   analysisDate DateTime       @default(now())
   status       AnalysisStatus @default(PENDING)
+  analysisType AnalysisType   @default(CHEMICAL)
   notes        String?
   approvedBy   String?
   approvedAt   DateTime?
@@ -224,8 +231,25 @@ model Analysis {
   results         AnalysisResult[]
   recommendations Recommendation[]
   reports         Report[]
+  attachments     AnalysisAttachment[]
 
   @@map("analyses")
+}
+
+model AnalysisAttachment {
+  id           String   @id @default(uuid())
+  analysisId   String
+  filename     String
+  originalName String
+  mimeType     String
+  fileSize     Int
+  description  String?
+  createdAt    DateTime @default(now())
+
+  // Relations
+  analysis Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@map("analysis_attachments")
 }
 
 model AnalysisResult {

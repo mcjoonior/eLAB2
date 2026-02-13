@@ -1,4 +1,4 @@
-import type { Deviation, Priority, SampleStatus, AnalysisStatus, ProcessType, SampleType, RecommendationType } from '@/types';
+import type { Deviation, Priority, SampleStatus, AnalysisStatus, AnalysisType, ProcessType, SampleType, RecommendationType } from '@/types';
 
 export function cn(...classes: (string | undefined | false)[]) {
   return classes.filter(Boolean).join(' ');
@@ -121,6 +121,28 @@ export function getAnalysisStatusLabel(status: AnalysisStatus): string {
     REJECTED: 'Odrzucona',
   };
   return labels[status] || status;
+}
+
+export function getAnalysisTypeLabel(type: AnalysisType): string {
+  const labels: Record<AnalysisType, string> = {
+    CHEMICAL: 'Analiza chemiczna',
+    CORROSION_TEST: 'Test korozji',
+    SURFACE_ANALYSIS: 'Analiza powierzchni',
+  };
+  return labels[type] || type;
+}
+
+export function getAnalysisTypeColor(type: AnalysisType): string {
+  switch (type) {
+    case 'CHEMICAL':
+      return 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300';
+    case 'CORROSION_TEST':
+      return 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300';
+    case 'SURFACE_ANALYSIS':
+      return 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300';
+    default:
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+  }
 }
 
 export function getProcessTypeLabel(type: ProcessType): string {

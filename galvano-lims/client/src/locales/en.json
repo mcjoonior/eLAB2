@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "GalvanoTech LIMS",
+    "name": "eLAB LIMS",
     "description": "Laboratory Management System"
   },
   "nav": {
@@ -31,12 +31,22 @@
   },
   "dashboard": {
     "title": "Dashboard",
+    "todoToday": "Due today",
+    "overdue": "Overdue",
+    "samplesWithoutAnalyses": "Samples without analyses",
+    "myInProgressAnalyses": "My analyses in progress",
     "samplesToday": "Samples today",
     "samplesThisWeek": "Samples this week",
     "samplesThisMonth": "Samples this month",
     "analysesInProgress": "Analyses in progress",
     "analysesCompleted": "Completed analyses",
+    "analysesShort": "analyses",
+    "samplesShort": "samples",
     "criticalDeviations": "Critical deviations",
+    "needsAttention": "Needs attention",
+    "viewAll": "View all",
+    "analyst": "Analyst",
+    "deadline": "Deadline",
     "recentAnalyses": "Recent analyses",
     "criticalAlerts": "Critical alerts",
     "quickActions": "Quick actions",
@@ -60,6 +70,8 @@
     "search": "Search client...",
     "noClients": "No clients",
     "confirmDelete": "Are you sure you want to deactivate this client?",
+    "deletePermanent": "Delete permanently",
+    "confirmPermanentDelete": "Are you sure you want to permanently delete client {{name}}? This action cannot be undone.",
     "exportCSV": "Export CSV",
     "history": "Analysis history"
   },

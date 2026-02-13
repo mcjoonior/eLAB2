@@ -2,7 +2,7 @@ import api from './api';
 import type { Client, PaginatedResponse } from '@/types';
 
 export const clientService = {
-  async getAll(params?: { page?: number; limit?: number; search?: string; isActive?: boolean }): Promise<PaginatedResponse<Client>> {
+  async getAll(params?: { page?: number; limit?: number; search?: string; isActive?: boolean | 'all' }): Promise<PaginatedResponse<Client>> {
     const response = await api.get('/clients', { params });
     return response.data;
   },
@@ -24,6 +24,10 @@ export const clientService = {
 
   async delete(id: string): Promise<void> {
     await api.delete(`/clients/${id}`);
+  },
+
+  async deletePermanent(id: string): Promise<void> {
+    await api.delete(`/clients/${id}/permanent`);
   },
 
   async exportCSV(): Promise<string> {

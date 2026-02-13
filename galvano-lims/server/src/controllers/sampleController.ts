@@ -31,6 +31,30 @@ const changeStatusSchema = z.object({
 });
 
 // ============================================================
+// GET /assignees - Lista aktywnych użytkowników do przypisań
+// ============================================================
+
+export const getAssignableUsers = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        role: true,
+      },
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+    });
+
+    res.json(users);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================
 // Generowanie kodu próbki: PRB-YYYYMM-XXXX
 // ============================================================
 
@@ -228,6 +252,16 @@ export const createSample = async (req: AuthenticatedRequest, res: Response, nex
       return;
     }
 
+    const assignedUserId = data.collectedBy ?? req.user!.userId;
+    const assignedUser = await prisma.user.findFirst({
+      where: { id: assignedUserId, isActive: true },
+      select: { id: true, firstName: true, lastName: true },
+    });
+    if (!assignedUser) {
+      res.status(404).json({ error: 'Przypisany użytkownik nie został znaleziony' });
+      return;
+    }
+
     const sampleCode = await generateSampleCode();
 
     const sample = await prisma.sample.create({
@@ -235,7 +269,7 @@ export const createSample = async (req: AuthenticatedRequest, res: Response, nex
         sampleCode,
         clientId: data.clientId,
         processId: data.processId,
-        collectedBy: data.collectedBy ?? req.user!.userId,
+        collectedBy: assignedUser.id,
         collectedAt: data.collectedAt ? new Date(data.collectedAt) : new Date(),
         sampleType: data.sampleType,
         description: data.description,
@@ -247,6 +281,18 @@ export const createSample = async (req: AuthenticatedRequest, res: Response, nex
         collector: { select: { id: true, firstName: true, lastName: true } },
       },
     });
+
+    if (assignedUser.id !== req.user!.userId) {
+      await prisma.notification.create({
+        data: {
+          userId: assignedUser.id,
+          title: 'Nowe przypisanie próbki',
+          message: `Przypisano Ci próbkę ${sample.sampleCode} dla klienta ${client.companyName}.`,
+          type: 'info',
+          link: `/samples/${sample.id}`,
+        },
+      });
+    }
 
     await prisma.auditLog.create({
       data: {

@@ -25,6 +25,9 @@ COPY --from=builder /app/prisma ./prisma
 
 RUN mkdir -p uploads reports
 
+COPY --from=builder /app/entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
+
 EXPOSE 3001
 
-CMD ["sh", "-c", "npx prisma db push --skip-generate && npx prisma db seed && node dist/index.js"]
+CMD ["./entrypoint.sh"]

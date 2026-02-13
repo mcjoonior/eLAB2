@@ -47,7 +47,9 @@ export const getClients = async (req: AuthenticatedRequest, res: Response, next:
     const where: Prisma.ClientWhereInput = {};
 
     // Filtr aktywności (domyślnie tylko aktywni)
-    if (isActive !== undefined) {
+    if (isActive === 'all') {
+      // no activity filter
+    } else if (isActive !== undefined) {
       where.isActive = isActive === 'true';
     } else {
       where.isActive = true;
@@ -297,6 +299,127 @@ export const deleteClient = async (req: AuthenticatedRequest, res: Response, nex
     });
 
     res.json({ message: 'Klient został dezaktywowany', client });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================
+// DELETE /:id/permanent - Trwale usuwa klienta (tylko ADMIN)
+// ============================================================
+
+export const permanentlyDeleteClient = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    const existing = await prisma.client.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            samples: true,
+            processes: true,
+          },
+        },
+      },
+    });
+
+    if (!existing) {
+      res.status(404).json({ error: 'Klient nie został znaleziony' });
+      return;
+    }
+
+    if (existing._count.samples > 0 || existing._count.processes > 0) {
+      res.status(409).json({
+        error: 'Nie można trwale usunąć klienta z powiązanymi próbkami lub procesami',
+      });
+      return;
+    }
+
+    const deleted = await prisma.client.delete({
+      where: { id },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.userId,
+        action: 'DELETE',
+        entityType: 'CLIENT',
+        entityId: deleted.id,
+        details: { companyName: deleted.companyName, softDelete: false, permanentDelete: true },
+      },
+    });
+
+    res.json({ message: 'Klient został trwale usunięty' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================
+// GET /export/csv - Eksport listy klientów do CSV
+// ============================================================
+
+export const exportClientsCsv = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { isActive } = req.query as Record<string, string | undefined>;
+
+    const where: Prisma.ClientWhereInput = {};
+    if (isActive !== undefined) {
+      where.isActive = isActive === 'true';
+    } else {
+      where.isActive = true;
+    }
+
+    const clients = await prisma.client.findMany({
+      where,
+      orderBy: { companyName: 'asc' },
+      select: {
+        companyName: true,
+        nip: true,
+        city: true,
+        contactPerson: true,
+        email: true,
+        phone: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
+
+    const escape = (value: unknown): string => {
+      if (value === null || value === undefined) return '';
+      const str = String(value).replace(/"/g, '""');
+      return `"${str}"`;
+    };
+
+    const headers = [
+      'Nazwa firmy',
+      'NIP',
+      'Miasto',
+      'Osoba kontaktowa',
+      'Email',
+      'Telefon',
+      'Aktywny',
+      'Utworzono',
+    ].join(';');
+
+    const rows = clients.map((client) => [
+      escape(client.companyName),
+      escape(client.nip),
+      escape(client.city),
+      escape(client.contactPerson),
+      escape(client.email),
+      escape(client.phone),
+      escape(client.isActive ? 'TAK' : 'NIE'),
+      escape(client.createdAt.toISOString().split('T')[0]),
+    ].join(';'));
+
+    const csv = '\uFEFF' + [headers, ...rows].join('\n');
+    const date = new Date().toISOString().split('T')[0];
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="klienci_${date}.csv"`);
+    res.send(csv);
   } catch (error) {
     next(error);
   }

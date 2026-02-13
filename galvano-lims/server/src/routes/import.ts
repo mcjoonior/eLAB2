@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, authorizeRoles } from '../middleware/auth';
 import {
   handleUpload,
   uploadImport,
@@ -16,6 +16,7 @@ const router = Router();
 
 // Wszystkie endpointy wymagaja autoryzacji
 router.use(authenticateToken as any);
+router.use(authorizeRoles('ADMIN') as any);
 
 // POST /api/import/upload - Upload pliku (multer)
 router.post('/upload', uploadImport.single('file') as any, handleUpload as any);

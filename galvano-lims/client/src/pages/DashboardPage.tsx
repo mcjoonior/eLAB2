@@ -1,42 +1,50 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  TestTubes,
-  Calendar,
-  Microscope,
-  AlertTriangle,
-  CheckCircle,
+  ClipboardList,
+  AlarmClock,
   FlaskConical,
+  UserCog,
+  TriangleAlert,
+  ChevronRight,
   Plus,
-  ArrowRight,
+  FileSpreadsheet,
+  FileText,
 } from 'lucide-react';
 import { dashboardService } from '@/services/dashboardService';
-import type { DashboardStats, Analysis } from '@/types';
-import {
-  getAnalysisStatusColor,
-  getAnalysisStatusLabel,
-  formatDate,
-} from '@/utils/helpers';
+import { useAuthStore } from '@/store/authStore';
+import type { DashboardOverview } from '@/types';
+import { getAnalysisStatusColor, getAnalysisStatusLabel, formatDate, formatDateTime } from '@/utils/helpers';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
-interface CriticalAlert {
-  id: string;
-  parameterName: string;
+type KpiCard = {
+  key: string;
+  title: string;
   value: number;
-  unit?: string;
-  deviation: string;
-  analysisId?: string;
-  sampleCode?: string;
-}
+  subtitle?: string;
+  icon: typeof ClipboardList;
+  classes: string;
+  iconClasses: string;
+};
+
+const attentionTagClasses: Record<string, string> = {
+  OVERDUE: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200',
+  NO_ANALYSIS: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200',
+};
+
+const actionIcons: Record<string, typeof Plus> = {
+  'add-sample': Plus,
+  'add-analysis': ClipboardList,
+  import: FileSpreadsheet,
+  'generate-report': FileText,
+};
 
 export default function DashboardPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [recentAnalyses, setRecentAnalyses] = useState<Analysis[]>([]);
-  const [criticalAlerts, setCriticalAlerts] = useState<CriticalAlert[]>([]);
+  const user = useAuthStore((s) => s.user);
+  const [overview, setOverview] = useState<DashboardOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -44,14 +52,8 @@ export default function DashboardPage() {
     async function fetchData() {
       try {
         setLoading(true);
-        const [statsData, analysesData, alertsData] = await Promise.all([
-          dashboardService.getStats(),
-          dashboardService.getRecentAnalyses(),
-          dashboardService.getCriticalAlerts(),
-        ]);
-        setStats(statsData);
-        setRecentAnalyses(analysesData);
-        setCriticalAlerts(alertsData);
+        const data = await dashboardService.getOverview();
+        setOverview(data);
       } catch (err: any) {
         setError(err?.response?.data?.message || t('common.errorOccurred'));
       } finally {
@@ -65,106 +67,90 @@ export default function DashboardPage() {
     return <LoadingSpinner size="lg" text={t('common.loading')} />;
   }
 
-  if (error) {
+  if (error || !overview) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 p-6 text-sm text-red-700 dark:text-red-400 max-w-md text-center">
-          {error}
+          {error || t('common.errorOccurred')}
         </div>
       </div>
     );
   }
 
-  const statCards = [
+  const kpis: KpiCard[] = [
     {
-      label: t('dashboard.samplesToday'),
-      value: stats?.samplesToday ?? 0,
-      icon: TestTubes,
-      bg: 'bg-blue-50 dark:bg-blue-950',
-      iconBg: 'bg-blue-100 dark:bg-blue-900',
-      iconColor: 'text-blue-600 dark:text-blue-400',
-      textColor: 'text-blue-900 dark:text-blue-100',
+      key: 'due-today',
+      title: t('dashboard.todoToday'),
+      value: overview.kpis.dueTodayAnalyses,
+      subtitle: `${overview.kpis.dueTodayAnalyses} ${t('dashboard.analysesShort')} • ${overview.kpis.dueTodaySamples} ${t('dashboard.samplesShort')}`,
+      icon: ClipboardList,
+      classes: 'bg-blue-50 dark:bg-blue-950/60',
+      iconClasses: 'bg-blue-100 text-blue-600 dark:bg-blue-900/60 dark:text-blue-300',
     },
     {
-      label: t('dashboard.samplesThisWeek'),
-      value: stats?.samplesThisWeek ?? 0,
-      icon: Calendar,
-      bg: 'bg-purple-50 dark:bg-purple-950',
-      iconBg: 'bg-purple-100 dark:bg-purple-900',
-      iconColor: 'text-purple-600 dark:text-purple-400',
-      textColor: 'text-purple-900 dark:text-purple-100',
+      key: 'overdue',
+      title: t('dashboard.overdue'),
+      value: overview.kpis.overdueAnalyses,
+      subtitle: `${overview.kpis.overdueAnalyses} ${t('dashboard.analysesShort')}`,
+      icon: AlarmClock,
+      classes: 'bg-amber-50 dark:bg-amber-950/60',
+      iconClasses: 'bg-amber-100 text-amber-600 dark:bg-amber-900/60 dark:text-amber-300',
     },
     {
-      label: t('dashboard.samplesThisMonth'),
-      value: stats?.samplesThisMonth ?? 0,
-      icon: Calendar,
-      bg: 'bg-indigo-50 dark:bg-indigo-950',
-      iconBg: 'bg-indigo-100 dark:bg-indigo-900',
-      iconColor: 'text-indigo-600 dark:text-indigo-400',
-      textColor: 'text-indigo-900 dark:text-indigo-100',
+      key: 'samples-without-analyses',
+      title: t('dashboard.samplesWithoutAnalyses'),
+      value: overview.kpis.samplesWithoutAnalyses,
+      subtitle: `${overview.kpis.samplesWithoutAnalyses} ${t('dashboard.samplesShort')}`,
+      icon: FlaskConical,
+      classes: 'bg-violet-50 dark:bg-violet-950/60',
+      iconClasses: 'bg-violet-100 text-violet-600 dark:bg-violet-900/60 dark:text-violet-300',
     },
     {
-      label: t('dashboard.analysesInProgress'),
-      value: stats?.analysesInProgress ?? 0,
-      icon: Microscope,
-      bg: 'bg-yellow-50 dark:bg-yellow-950',
-      iconBg: 'bg-yellow-100 dark:bg-yellow-900',
-      iconColor: 'text-yellow-600 dark:text-yellow-400',
-      textColor: 'text-yellow-900 dark:text-yellow-100',
+      key: 'my-in-progress',
+      title: t('dashboard.myInProgressAnalyses'),
+      value: overview.kpis.myInProgressAnalyses,
+      subtitle: `${overview.kpis.myInProgressAnalyses} ${t('dashboard.analysesShort')}`,
+      icon: UserCog,
+      classes: 'bg-emerald-50 dark:bg-emerald-950/60',
+      iconClasses: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/60 dark:text-emerald-300',
     },
     {
-      label: t('dashboard.analysesCompleted'),
-      value: stats?.analysesCompleted ?? 0,
-      icon: CheckCircle,
-      bg: 'bg-green-50 dark:bg-green-950',
-      iconBg: 'bg-green-100 dark:bg-green-900',
-      iconColor: 'text-green-600 dark:text-green-400',
-      textColor: 'text-green-900 dark:text-green-100',
-    },
-    {
-      label: t('dashboard.criticalDeviations'),
-      value: stats?.criticalDeviations ?? 0,
-      icon: AlertTriangle,
-      bg: 'bg-red-50 dark:bg-red-950',
-      iconBg: 'bg-red-100 dark:bg-red-900',
-      iconColor: 'text-red-600 dark:text-red-400',
-      textColor: 'text-red-900 dark:text-red-100',
+      key: 'critical',
+      title: t('dashboard.criticalDeviations'),
+      value: overview.kpis.criticalDeviationAnalyses,
+      subtitle: `${overview.kpis.criticalDeviationAnalyses} ${t('dashboard.analysesShort')}`,
+      icon: TriangleAlert,
+      classes: 'bg-cyan-50 dark:bg-cyan-950/60',
+      iconClasses: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/60 dark:text-cyan-300',
     },
   ];
 
+  const quickActions = overview.quickActions.filter((action) => {
+    if (action.id === 'import') {
+      return (user?.role || '').toUpperCase() === 'ADMIN';
+    }
+    return true;
+  });
+
   return (
     <div className="space-y-6">
-      {/* Page Title */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          {t('dashboard.title')}
-        </h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('dashboard.title')}</h1>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        {statCards.map((card) => {
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+        {kpis.map((card) => {
           const Icon = card.icon;
           return (
-            <div
-              key={card.label}
-              className={`${card.bg} rounded-xl border border-gray-200 dark:border-gray-700 p-4`}
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className={`${card.iconBg} rounded-lg p-2 flex-shrink-0`}
-                >
-                  <Icon className={`h-5 w-5 ${card.iconColor}`} />
+            <div key={card.key} className={`${card.classes} rounded-xl border border-gray-200 dark:border-gray-700 p-4`}>
+              <div className="flex items-start gap-3">
+                <div className={`rounded-lg p-2 ${card.iconClasses}`}>
+                  <Icon className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {card.value}
-                  </p>
-                  <p
-                    className={`text-xs font-medium ${card.textColor} truncate`}
-                  >
-                    {card.label}
-                  </p>
+                  <p className="text-base font-semibold text-gray-900 dark:text-white leading-tight">{card.title}</p>
+                  <p className="mt-1 text-3xl font-bold text-gray-900 dark:text-white">{card.value}</p>
+                  {card.subtitle && <p className="mt-0.5 text-sm text-gray-600 dark:text-gray-300">{card.subtitle}</p>}
                 </div>
               </div>
             </div>
@@ -172,177 +158,119 @@ export default function DashboardPage() {
         })}
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Analyses Table - spans 2 columns */}
-        <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-              {t('dashboard.recentAnalyses')}
-            </h2>
-            <Link
-              to="/analyses"
-              className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
-            >
-              {t('common.all')}
-              <ArrowRight className="h-3.5 w-3.5" />
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+        <div className="xl:col-span-9 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">{t('dashboard.needsAttention')}</h2>
+            <Link to="/analyses" className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 text-sm font-medium hover:underline">
+              {t('dashboard.viewAll')}
+              <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
-
-          {recentAnalyses.length === 0 ? (
-            <div className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
-              {t('common.noData')}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 dark:border-gray-700">
-                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      {t('analyses.analysisCode')}
-                    </th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      {t('analyses.sample')}
-                    </th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      {t('samples.client')}
-                    </th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      {t('common.status')}
-                    </th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      {t('common.date')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                  {recentAnalyses.map((analysis) => (
-                    <tr
-                      key={analysis.id}
-                      onClick={() => navigate(`/analyses/${analysis.id}`)}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer transition-colors"
-                    >
-                      <td className="px-6 py-3 font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                        {analysis.analysisCode}
-                      </td>
-                      <td className="px-6 py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">
-                        {analysis.sample?.sampleCode ?? '—'}
-                      </td>
-                      <td className="px-6 py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">
-                        {analysis.sample?.client?.companyName ?? '—'}
-                      </td>
-                      <td className="px-6 py-3 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getAnalysisStatusColor(analysis.status)}`}
-                        >
-                          {getAnalysisStatusLabel(analysis.status)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                        {formatDate(analysis.analysisDate)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Right Column: Alerts + Quick Actions */}
-        <div className="space-y-6">
-          {/* Critical Alerts */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-            <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-              <AlertTriangle className="h-4 w-4 text-red-500" />
-              <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                {t('dashboard.criticalAlerts')}
-              </h2>
-            </div>
-
-            {criticalAlerts.length === 0 ? (
-              <div className="px-6 py-8 text-center">
-                <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {t('common.noData')}
-                </p>
+          <div className="p-4 space-y-2">
+            {overview.attentionItems.length === 0 ? (
+              <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-sm text-gray-500 dark:text-gray-400">
+                {t('common.noData')}
               </div>
             ) : (
-              <ul className="divide-y divide-gray-100 dark:divide-gray-700 max-h-80 overflow-y-auto">
-                {criticalAlerts.map((alert, idx) => (
-                  <li
-                    key={alert.id ?? idx}
-                    className="px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors cursor-pointer"
-                    onClick={() =>
-                      alert.analysisId &&
-                      navigate(`/analyses/${alert.analysisId}`)
-                    }
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="mt-0.5 flex-shrink-0 h-2 w-2 rounded-full bg-red-500" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                          {alert.parameterName}
-                        </p>
-                        <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">
-                          {alert.value}
-                          {alert.unit ? ` ${alert.unit}` : ''} &mdash;{' '}
-                          {alert.deviation}
-                        </p>
-                        {alert.sampleCode && (
-                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                            {alert.sampleCode}
-                          </p>
-                        )}
-                      </div>
+              overview.attentionItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => navigate(item.link)}
+                  className="w-full text-left rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${attentionTagClasses[item.type] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'}`}
+                      >
+                        {item.tag}
+                      </span>
+                      <p className="mt-1 text-base font-semibold text-gray-900 dark:text-white truncate">{item.message}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">{item.details}</p>
                     </div>
-                  </li>
-                ))}
-              </ul>
+                    <div className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatDate(item.date)}</div>
+                  </div>
+                </button>
+              ))
             )}
           </div>
+        </div>
 
-          {/* Quick Actions */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                {t('dashboard.quickActions')}
-              </h2>
-            </div>
-
-            <div className="p-4 space-y-3">
-              <Link
-                to="/samples?new=1"
-                className="flex items-center gap-3 w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-4 py-3 text-sm font-medium text-gray-900 dark:text-white hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
-              >
-                <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400">
-                  <Plus className="h-4 w-4" />
-                </div>
-                <div>
-                  <span className="block">{t('dashboard.addSample')}</span>
-                  <span className="block text-xs text-gray-500 dark:text-gray-400 font-normal">
-                    {t('samples.addSample')}
+        <div className="xl:col-span-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+          <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">{t('dashboard.quickActions')}</h2>
+          </div>
+          <div className="p-4 space-y-2">
+            {quickActions.map((action) => {
+              const Icon = actionIcons[action.id] || ChevronRight;
+              return (
+                <button
+                  key={action.id}
+                  onClick={() => navigate(action.link)}
+                  className="w-full flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+                >
+                  <span className="inline-flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-white">
+                    <Icon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    {action.label}
                   </span>
-                </div>
-              </Link>
-
-              <Link
-                to="/analyses?new=1"
-                className="flex items-center gap-3 w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-4 py-3 text-sm font-medium text-gray-900 dark:text-white hover:bg-green-50 dark:hover:bg-green-900/30 hover:border-green-300 dark:hover:border-green-700 transition-colors"
-              >
-                <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400">
-                  <FlaskConical className="h-4 w-4" />
-                </div>
-                <div>
-                  <span className="block">{t('dashboard.newAnalysis')}</span>
-                  <span className="block text-xs text-gray-500 dark:text-gray-400 font-normal">
-                    {t('analyses.addAnalysis')}
-                  </span>
-                </div>
-              </Link>
-            </div>
+                  <ChevronRight className="h-4 w-4 text-gray-400" />
+                </button>
+              );
+            })}
           </div>
         </div>
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">{t('dashboard.recentAnalyses')}</h2>
+          <Link to="/analyses" className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 text-sm font-medium hover:underline">
+            {t('dashboard.viewAll')}
+            <ChevronRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        {overview.recentAnalyses.length === 0 ? (
+          <div className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">{t('common.noData')}</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 dark:border-gray-700">
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">{t('analyses.analysisCode')}</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">{t('analyses.sample')}</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">{t('samples.client')}</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">{t('dashboard.analyst')}</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">{t('common.status')}</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">{t('dashboard.deadline')}</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">{t('common.date')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {overview.recentAnalyses.map((analysis) => (
+                  <tr
+                    key={analysis.id}
+                    onClick={() => navigate(analysis.link)}
+                    className="hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer transition-colors"
+                  >
+                    <td className="px-5 py-3 font-semibold text-gray-900 dark:text-white whitespace-nowrap">{analysis.analysisCode}</td>
+                    <td className="px-5 py-3 text-gray-700 dark:text-gray-200 whitespace-nowrap">{analysis.sampleCode}</td>
+                    <td className="px-5 py-3 text-gray-700 dark:text-gray-200 whitespace-nowrap">{analysis.clientName}</td>
+                    <td className="px-5 py-3 text-gray-700 dark:text-gray-200 whitespace-nowrap">{analysis.analystName}</td>
+                    <td className="px-5 py-3 whitespace-nowrap">
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${getAnalysisStatusColor(analysis.status)}`}>
+                        {getAnalysisStatusLabel(analysis.status)}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-gray-700 dark:text-gray-200 whitespace-nowrap">{formatDate(analysis.deadline)}</td>
+                    <td className="px-5 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatDateTime(analysis.date)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

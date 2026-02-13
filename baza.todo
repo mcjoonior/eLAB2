@@ -1,0 +1,10 @@
+- [ ] Poprawić tryb `ANALYSES_ONLY`, aby wyszukiwał próbkę po `sample.sampleCode` lub `sample.legacyCode` i dopiero wtedy tworzył analizę.
+- [ ] Dodać walidację importu `ANALYSES_ONLY`: jeśli nie znaleziono próbki docelowej, zwracać błąd wiersza (bez cichego pominięcia).
+- [ ] Usunąć fallback w `SAMPLES_ONLY`, który przypina próbkę do „pierwszego aktywnego klienta”.
+- [ ] Usunąć fallback w `SAMPLES_ONLY`, który przypina próbkę do „pierwszego aktywnego procesu”.
+- [ ] Wymusić jawne mapowanie pól identyfikujących dla `SAMPLES_ONLY` (np. klient/proces) albo jasną strategię dopasowania.
+- [ ] Dodać raport „niepowiązanych wierszy” (próbka/analiza bez poprawnego powiązania) w wyniku walidacji i wykonania importu.
+- [ ] Rozszerzyć walidację o kontrolę spójności relacji: klient -> proces -> próbka -> analiza.
+- [ ] Rozważyć wykorzystanie `sourceSystem` do strategii dopasowania (obecnie tylko metadata).
+- [ ] Dodać testy integracyjne importu dla scenariuszy: `FULL`, `SAMPLES_ONLY`, `ANALYSES_ONLY`.
+- [ ] Dodać test regresji: analiza nie może zostać zaimportowana bez poprawnego `sampleId`.

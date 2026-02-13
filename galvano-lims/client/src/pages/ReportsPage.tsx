@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, Send, X } from 'lucide-react';
+import { Download, Send, X, Trash2 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Pagination } from '@/components/common/Pagination';
 import { reportService } from '@/services/reportService';
+import { useAuthStore } from '@/store/authStore';
 import { formatDate, formatDateTime } from '@/utils/helpers';
 import type { Report } from '@/types';
 
 export default function ReportsPage() {
   const { t } = useTranslation();
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === 'ADMIN';
 
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,6 +29,7 @@ export default function ReportsPage() {
   const [sendEmail, setSendEmail] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
+  const [confirmDeleteReport, setConfirmDeleteReport] = useState<Report | null>(null);
 
   useEffect(() => {
     fetchReports();
@@ -81,6 +85,20 @@ export default function ReportsPage() {
       setSendError('Nie udało się wysłać raportu. Spróbuj ponownie.');
     } finally {
       setSending(false);
+    }
+  }
+
+  async function handleDeleteReport() {
+    if (!confirmDeleteReport) return;
+    try {
+      await reportService.delete(confirmDeleteReport.id);
+      setConfirmDeleteReport(null);
+      setSuccess('Raport został usunięty.');
+      setTimeout(() => setSuccess(''), 3000);
+      fetchReports();
+    } catch {
+      setError('Nie udało się usunąć raportu. Spróbuj ponownie.');
+      setConfirmDeleteReport(null);
     }
   }
 
@@ -187,6 +205,16 @@ export default function ReportsPage() {
                           <Send className="h-3 w-3" />
                           Wyślij
                         </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => setConfirmDeleteReport(report)}
+                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30 transition-colors"
+                            title={t('common.delete')}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            {t('common.delete')}
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -202,6 +230,33 @@ export default function ReportsPage() {
               limit={limit}
               onPageChange={setPage}
             />
+          </div>
+        </div>
+      )}
+
+      {confirmDeleteReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              Usuń raport
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              Czy na pewno chcesz usunąć raport <strong>{confirmDeleteReport.reportCode}</strong>?
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setConfirmDeleteReport(null)}
+                className="rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={handleDeleteReport}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
+              >
+                {t('common.delete')}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -13,7 +13,10 @@ import { sendReportEmail } from '../services/emailService';
 // ============================================================
 
 const sendEmailSchema = z.object({
-  recipientEmail: z.string().email('Nieprawidlowy adres e-mail'),
+  recipientEmail: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().email('Nieprawidlowy adres e-mail').optional(),
+  ),
 });
 
 // ============================================================
@@ -338,7 +341,7 @@ export const sendReportByEmail = async (req: AuthenticatedRequest, res: Response
           include: {
             sample: {
               include: {
-                client: { select: { companyName: true } },
+                client: { select: { companyName: true, email: true } },
                 process: { select: { name: true } },
               },
             },
@@ -357,10 +360,16 @@ export const sendReportByEmail = async (req: AuthenticatedRequest, res: Response
       return;
     }
 
+    const targetEmail = recipientEmail ?? report.analysis.sample.client.email ?? undefined;
+    if (!targetEmail) {
+      res.status(400).json({ error: 'Brak adresu e-mail odbiorcy. Uzupelnij email klienta lub podaj go recznie.' });
+      return;
+    }
+
     // Wyslij email
     await sendReportEmail({
       reportId: report.id,
-      recipientEmail,
+      recipientEmail: targetEmail,
       reportCode: report.reportCode,
       pdfPath: report.pdfPath,
       analysisCode: report.analysis.analysisCode,
@@ -378,16 +387,68 @@ export const sendReportByEmail = async (req: AuthenticatedRequest, res: Response
         entityId: report.id,
         details: {
           reportCode: report.reportCode,
-          recipientEmail,
+          recipientEmail: targetEmail,
           sentAt: new Date().toISOString(),
         },
       },
     });
 
     res.json({
-      message: `Raport ${report.reportCode} zostal wyslany na adres ${recipientEmail}`,
-      sentToEmail: recipientEmail,
+      message: `Raport ${report.reportCode} zostal wyslany na adres ${targetEmail}`,
+      sentToEmail: targetEmail,
       sentAt: new Date(),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================
+// DELETE /:id - Usuniecie raportu (tylko ADMIN)
+// ============================================================
+
+export const deleteReport = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    const existing = await prisma.report.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        reportCode: true,
+        pdfPath: true,
+      },
+    });
+
+    if (!existing) {
+      res.status(404).json({ error: 'Raport nie zostal znaleziony' });
+      return;
+    }
+
+    await prisma.report.delete({ where: { id } });
+
+    if (existing.pdfPath && fs.existsSync(existing.pdfPath)) {
+      try {
+        fs.unlinkSync(existing.pdfPath);
+      } catch {
+        // Ignore file system delete errors and keep API successful.
+      }
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.userId,
+        action: 'DELETE',
+        entityType: 'REPORT',
+        entityId: existing.id,
+        details: {
+          reportCode: existing.reportCode,
+        },
+      },
+    });
+
+    res.json({
+      message: `Raport ${existing.reportCode} zostal usuniety`,
     });
   } catch (error) {
     next(error);

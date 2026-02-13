@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent, type ChangeEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -13,6 +13,9 @@ import {
   Square,
   RotateCcw,
   Trash2,
+  Upload,
+  Image as ImageIcon,
+  X,
 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { analysisService } from '@/services/analysisService';
@@ -21,6 +24,8 @@ import { useAuthStore } from '@/store/authStore';
 import {
   getAnalysisStatusColor,
   getAnalysisStatusLabel,
+  getAnalysisTypeLabel,
+  getAnalysisTypeColor,
   getDeviationColor,
   getDeviationBadgeColor,
   getDeviationLabel,
@@ -35,6 +40,7 @@ import type {
   Analysis,
   AnalysisResult,
   AnalysisStatus,
+  AnalysisType,
   Recommendation,
   Deviation,
   Priority,
@@ -115,6 +121,11 @@ export default function AnalysisDetailPage() {
   });
   const [addingRecommendation, setAddingRecommendation] = useState(false);
   const [recError, setRecError] = useState('');
+
+  // Attachments
+  const [uploadingAttachments, setUploadingAttachments] = useState(false);
+  const [attachmentDesc, setAttachmentDesc] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Report actions
   const [generatingReport, setGeneratingReport] = useState(false);
@@ -340,6 +351,39 @@ export default function AnalysisDetailPage() {
     }
   }
 
+  async function handleUploadAttachments(e: ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setUploadingAttachments(true);
+    setActionError('');
+    setActionSuccess('');
+    try {
+      await analysisService.uploadAttachments(id!, Array.from(files), attachmentDesc || undefined);
+      setActionSuccess(`Przesłano ${files.length} załącznik(ów).`);
+      setAttachmentDesc('');
+      setTimeout(() => setActionSuccess(''), 3000);
+      fetchAnalysis();
+    } catch {
+      setActionError('Nie udało się przesłać załączników.');
+    } finally {
+      setUploadingAttachments(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  async function handleDeleteAttachment(attachmentId: string) {
+    setActionError('');
+    setActionSuccess('');
+    try {
+      await analysisService.deleteAttachment(id!, attachmentId);
+      setActionSuccess('Załącznik został usunięty.');
+      setTimeout(() => setActionSuccess(''), 3000);
+      fetchAnalysis();
+    } catch {
+      setActionError('Nie udało się usunąć załącznika.');
+    }
+  }
+
   async function handleApprove() {
     setApprovingAnalysis(true);
     setActionError('');
@@ -412,6 +456,9 @@ export default function AnalysisDetailPage() {
               </h1>
               <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${getAnalysisStatusColor(analysis.status)}`}>
                 {getAnalysisStatusLabel(analysis.status)}
+              </span>
+              <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${getAnalysisTypeColor(analysis.analysisType)}`}>
+                {getAnalysisTypeLabel(analysis.analysisType)}
               </span>
             </div>
 
@@ -785,6 +832,82 @@ export default function AnalysisDetailPage() {
         ) : (
           <div className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
             Brak wyników dla tej analizy.
+          </div>
+        )}
+      </div>
+
+      {/* Attachments section */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+            <ImageIcon className="h-5 w-5" />
+            Załączniki fotograficzne ({analysis.attachments?.length || 0})
+          </h2>
+          {isEditable && (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={attachmentDesc}
+                onChange={(e) => setAttachmentDesc(e.target.value)}
+                placeholder="Opis zdjęcia (opcjonalnie)"
+                className="w-48 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none"
+              />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleUploadAttachments}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAttachments}
+                className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-60"
+              >
+                {uploadingAttachments ? (
+                  <div className="h-4 w-4 border-2 border-blue-400 border-t-blue-700 rounded-full animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4" />
+                )}
+                Dodaj zdjęcia
+              </button>
+            </div>
+          )}
+        </div>
+
+        {(!analysis.attachments || analysis.attachments.length === 0) ? (
+          <div className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            Brak załączników fotograficznych.
+          </div>
+        ) : (
+          <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {analysis.attachments.map((att) => (
+              <div key={att.id} className="group relative rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <img
+                  src={`/uploads/attachments/${att.filename}`}
+                  alt={att.description || att.originalName}
+                  className="w-full h-40 object-cover cursor-pointer"
+                  onClick={() => window.open(`/uploads/attachments/${att.filename}`, '_blank')}
+                />
+                <div className="p-2">
+                  <p className="text-xs text-gray-700 dark:text-gray-300 truncate" title={att.originalName}>
+                    {att.description || att.originalName}
+                  </p>
+                  <p className="text-[10px] text-gray-400">{(att.fileSize / 1024).toFixed(0)} KB</p>
+                </div>
+                {isEditable && (
+                  <button
+                    onClick={() => handleDeleteAttachment(att.id)}
+                    className="absolute top-1 right-1 p-1 rounded-full bg-red-600/80 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700"
+                    title="Usuń załącznik"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>

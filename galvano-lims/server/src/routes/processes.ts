@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, authorizeRoles } from '../middleware/auth';
 import {
   getProcesses,
   getProcessById,
@@ -19,6 +19,6 @@ router.get('/:id', getProcessById as any);
 router.post('/', createProcess as any);
 router.put('/:id', updateProcess as any);
 router.post('/:id/clone', cloneProcess as any);
-router.delete('/:id', deleteProcess as any);
+router.delete('/:id', authorizeRoles('ADMIN') as any, deleteProcess as any);
 
 export default router;
