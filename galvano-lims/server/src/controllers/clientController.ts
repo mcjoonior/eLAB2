@@ -531,6 +531,7 @@ export const exportClientData = async (req: AuthenticatedRequest, res: Response,
       'Wykonał',
       'Parametr',
       'Wartość',
+      'Niepewność pomiaru',
       'Jednostka',
       'Min',
       'Max',
@@ -550,7 +551,7 @@ export const exportClientData = async (req: AuthenticatedRequest, res: Response,
           sample.process.name,
           sample.process.processType,
           sample.status,
-          '', '', '', '', '', '', '', '', '', '', '',
+          '', '', '', '', '', '', '', '', '', '', '', '',
         ].join(';'));
       }
 
@@ -567,7 +568,7 @@ export const exportClientData = async (req: AuthenticatedRequest, res: Response,
             analysis.analysisDate.toISOString().split('T')[0],
             analysis.status,
             `${analysis.performer.firstName} ${analysis.performer.lastName}`,
-            '', '', '', '', '', '', '',
+            '', '', '', '', '', '', '', '',
           ].join(';'));
         }
 
@@ -585,6 +586,7 @@ export const exportClientData = async (req: AuthenticatedRequest, res: Response,
             `${analysis.performer.firstName} ${analysis.performer.lastName}`,
             result.parameterName,
             result.value.toString(),
+            result.measurementUncertainty?.toString() ?? '',
             result.unit,
             result.minReference?.toString() ?? '',
             result.maxReference?.toString() ?? '',

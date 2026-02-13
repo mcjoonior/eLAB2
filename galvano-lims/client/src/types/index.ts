@@ -7,7 +7,7 @@ export type ProcessType = string;
 export type SampleType = 'BATH' | 'RINSE' | 'WASTEWATER' | 'RAW_MATERIAL' | 'OTHER';
 export type SampleStatus = 'REGISTERED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export type AnalysisStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'APPROVED' | 'REJECTED';
-export type AnalysisType = 'CHEMICAL' | 'CORROSION_TEST' | 'SURFACE_ANALYSIS';
+export type AnalysisType = 'CHEMICAL';
 export type Deviation = 'CRITICAL_LOW' | 'BELOW_MIN' | 'WITHIN_RANGE' | 'ABOVE_MAX' | 'CRITICAL_HIGH';
 export type RecommendationType = 'INCREASE' | 'DECREASE' | 'MAINTAIN' | 'URGENT_ACTION';
 export type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -139,6 +139,7 @@ export interface AnalysisResult {
   parameterName: string;
   unit: string;
   value: number;
+  measurementUncertainty?: number;
   minReference?: number;
   maxReference?: number;
   optimalReference?: number;

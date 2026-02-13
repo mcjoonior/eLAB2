@@ -1,15 +1,28 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Pencil, X, Building2, MapPin, User, Mail, Phone, FileText } from 'lucide-react';
+import { ArrowLeft, Pencil, X, Building2, MapPin, User, Mail, Phone, FileText, TrendingUp } from 'lucide-react';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ReferenceLine,
+  ResponsiveContainer,
+} from 'recharts';
 import { clientService } from '@/services/clientService';
 import { sampleService } from '@/services/sampleService';
 import { analysisService } from '@/services/analysisService';
+import { archiveService } from '@/services/archiveService';
+import { processService } from '@/services/processService';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { formatDate, getSampleStatusLabel, getSampleStatusColor, getAnalysisStatusLabel, getAnalysisStatusColor, getProcessTypeLabel } from '@/utils/helpers';
-import type { Client, Sample, Analysis } from '@/types';
+import { formatDate, formatNumber, getSampleStatusLabel, getSampleStatusColor, getAnalysisStatusLabel, getAnalysisStatusColor, getProcessTypeLabel } from '@/utils/helpers';
+import type { Client, Sample, Analysis, Process, ProcessParameter, TrendDataPoint } from '@/types';
 
-type Tab = 'samples' | 'analyses';
+type Tab = 'samples' | 'analyses' | 'trends';
 
 interface ClientForm {
   companyName: string;
@@ -36,8 +49,18 @@ export default function ClientDetailPage() {
   const [activeTab, setActiveTab] = useState<Tab>('samples');
   const [samples, setSamples] = useState<Sample[]>([]);
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
+  const [clientProcesses, setClientProcesses] = useState<Process[]>([]);
   const [samplesLoading, setSamplesLoading] = useState(false);
   const [analysesLoading, setAnalysesLoading] = useState(false);
+  const [trendLoading, setTrendLoading] = useState(false);
+  const [trendError, setTrendError] = useState('');
+
+  const [selectedProcessId, setSelectedProcessId] = useState('');
+  const [selectedParameterName, setSelectedParameterName] = useState('');
+  const [trendDateFrom, setTrendDateFrom] = useState('');
+  const [trendDateTo, setTrendDateTo] = useState('');
+  const [processParameters, setProcessParameters] = useState<ProcessParameter[]>([]);
+  const [trendData, setTrendData] = useState<TrendDataPoint[]>([]);
 
   // Edit dialog
   const [editOpen, setEditOpen] = useState(false);
@@ -68,6 +91,11 @@ export default function ClientDetailPage() {
     try {
       const res = await sampleService.getAll({ clientId: id, limit: 100 });
       setSamples(res.data);
+      const processMap = new Map<string, Process>();
+      res.data.forEach((sample) => {
+        if (sample.process) processMap.set(sample.process.id, sample.process);
+      });
+      setClientProcesses(Array.from(processMap.values()));
     } catch {
       // silent
     } finally {
@@ -110,6 +138,49 @@ export default function ClientDetailPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
+
+  useEffect(() => {
+    async function loadProcessParameters() {
+      if (!selectedProcessId) {
+        setProcessParameters([]);
+        setSelectedParameterName('');
+        return;
+      }
+      try {
+        const process = await processService.getById(selectedProcessId);
+        setProcessParameters(process.parameters || []);
+      } catch {
+        setProcessParameters([]);
+      }
+    }
+    loadProcessParameters();
+  }, [selectedProcessId]);
+
+  const trendMin = useMemo(() => (trendData.length > 0 ? trendData[0].min : undefined), [trendData]);
+  const trendMax = useMemo(() => (trendData.length > 0 ? trendData[0].max : undefined), [trendData]);
+  const trendOptimal = useMemo(() => (trendData.length > 0 ? trendData[0].optimal : undefined), [trendData]);
+
+  async function handleFetchTrend() {
+    if (!id || !selectedProcessId || !selectedParameterName) return;
+    setTrendLoading(true);
+    setTrendError('');
+    try {
+      const data = await archiveService.getTrend({
+        clientId: id,
+        processId: selectedProcessId,
+        parameterName: selectedParameterName,
+        dateFrom: trendDateFrom || undefined,
+        dateTo: trendDateTo || undefined,
+        includeDrafts: true,
+      });
+      setTrendData(data);
+    } catch {
+      setTrendError('Nie udało się pobrać danych trendu.');
+      setTrendData([]);
+    } finally {
+      setTrendLoading(false);
+    }
+  }
 
   function openEdit() {
     if (!client) return;
@@ -321,6 +392,16 @@ export default function ClientDetailPage() {
           >
             {t('analyses.title')}
           </button>
+          <button
+            onClick={() => setActiveTab('trends')}
+            className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'trends'
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+            }`}
+          >
+            Trendy parametrów
+          </button>
         </nav>
       </div>
 
@@ -435,6 +516,136 @@ export default function ClientDetailPage() {
             </div>
           )}
         </>
+      )}
+
+      {activeTab === 'trends' && (
+        <div className="space-y-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  Proces
+                </label>
+                <select
+                  value={selectedProcessId}
+                  onChange={(e) => {
+                    setSelectedProcessId(e.target.value);
+                    setSelectedParameterName('');
+                    setTrendData([]);
+                  }}
+                  className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                >
+                  <option value="">Wybierz proces</option>
+                  {clientProcesses.map((process) => (
+                    <option key={process.id} value={process.id}>{process.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  Parametr
+                </label>
+                <select
+                  value={selectedParameterName}
+                  onChange={(e) => setSelectedParameterName(e.target.value)}
+                  disabled={!selectedProcessId || processParameters.length === 0}
+                  className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none disabled:opacity-50"
+                >
+                  <option value="">Wybierz parametr</option>
+                  {processParameters.map((parameter) => (
+                    <option key={parameter.id} value={parameter.parameterName}>
+                      {parameter.parameterName} [{parameter.unit}]
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  Od
+                </label>
+                <input
+                  type="date"
+                  value={trendDateFrom}
+                  onChange={(e) => setTrendDateFrom(e.target.value)}
+                  className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  Do
+                </label>
+                <input
+                  type="date"
+                  value={trendDateTo}
+                  onChange={(e) => setTrendDateTo(e.target.value)}
+                  className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-end">
+                <button
+                  onClick={handleFetchTrend}
+                  disabled={trendLoading || !selectedProcessId || !selectedParameterName}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <TrendingUp className="h-4 w-4" />
+                  Pokaż wykres
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            {trendError && (
+              <div className="mb-4 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 p-3 text-sm text-red-700 dark:text-red-400">
+                {trendError}
+              </div>
+            )}
+
+            {trendLoading ? (
+              <LoadingSpinner size="sm" text={t('common.loading')} />
+            ) : trendData.length === 0 ? (
+              <div className="text-center py-8 text-sm text-gray-500 dark:text-gray-400">
+                Brak danych trendu dla wybranych filtrów.
+              </div>
+            ) : (
+              <div className="w-full h-[380px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trendData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis
+                      dataKey="date"
+                      tickFormatter={(value: string) => formatDate(value)}
+                      tick={{ fontSize: 12 }}
+                      stroke="#9ca3af"
+                    />
+                    <YAxis tick={{ fontSize: 12 }} stroke="#9ca3af" />
+                    <Tooltip
+                      labelFormatter={(value: string) => formatDate(value)}
+                      formatter={(value: number) => [formatNumber(value), selectedParameterName]}
+                    />
+                    <Legend />
+                    {trendMin != null && <ReferenceLine y={trendMin} stroke="#dc2626" strokeDasharray="6 4" />}
+                    {trendMax != null && <ReferenceLine y={trendMax} stroke="#dc2626" strokeDasharray="6 4" />}
+                    {trendOptimal != null && <ReferenceLine y={trendOptimal} stroke="#16a34a" strokeDasharray="6 4" />}
+                    <Line
+                      type="monotone"
+                      dataKey="value"
+                      stroke="#2563eb"
+                      strokeWidth={2}
+                      dot={{ r: 3, fill: '#2563eb' }}
+                      activeDot={{ r: 5 }}
+                      name={selectedParameterName}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Edit dialog */}

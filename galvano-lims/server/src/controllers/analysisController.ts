@@ -13,13 +13,11 @@ import { AuthenticatedRequest } from '../middleware/auth';
 
 const createAnalysisSchema = z.object({
   sampleId: z.string().uuid('Nieprawidlowy identyfikator probki'),
-  analysisType: z.enum(['CHEMICAL', 'CORROSION_TEST', 'SURFACE_ANALYSIS']).optional().default('CHEMICAL'),
   analysisDate: z.string().datetime().optional().nullable(),
   notes: z.string().optional().nullable(),
 });
 
 const updateAnalysisSchema = z.object({
-  analysisType: z.enum(['CHEMICAL', 'CORROSION_TEST', 'SURFACE_ANALYSIS']).optional(),
   analysisDate: z.string().datetime().optional().nullable(),
   notes: z.string().optional().nullable(),
 });
@@ -32,6 +30,7 @@ const saveResultSchema = z.object({
   parameterName: z.string().min(1, 'Nazwa parametru jest wymagana'),
   unit: z.string().min(1, 'Jednostka jest wymagana'),
   value: z.number({ required_error: 'Wartosc jest wymagana' }),
+  measurementUncertainty: z.number().optional().nullable(),
   minReference: z.number().optional().nullable(),
   maxReference: z.number().optional().nullable(),
   optimalReference: z.number().optional().nullable(),
@@ -285,7 +284,7 @@ export const createAnalysis = async (req: AuthenticatedRequest, res: Response, n
         analysisCode,
         sampleId: data.sampleId,
         performedBy: req.user!.userId,
-        analysisType: data.analysisType as any,
+        analysisType: 'CHEMICAL' as any,
         analysisDate: data.analysisDate ? new Date(data.analysisDate) : new Date(),
         notes: data.notes,
         status: 'PENDING',
@@ -605,6 +604,9 @@ export const saveAnalysisResults = async (req: AuthenticatedRequest, res: Respon
             parameterName: result.parameterName,
             unit: result.unit,
             value: new Prisma.Decimal(result.value),
+            measurementUncertainty: result.measurementUncertainty != null
+              ? new Prisma.Decimal(result.measurementUncertainty)
+              : null,
             minReference: result.minReference != null ? new Prisma.Decimal(result.minReference) : null,
             maxReference: result.maxReference != null ? new Prisma.Decimal(result.maxReference) : null,
             optimalReference: result.optimalReference != null ? new Prisma.Decimal(result.optimalReference) : null,

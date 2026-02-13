@@ -4,7 +4,6 @@ import {
   getArchivedAnalyses,
   getTrendData,
   exportAnalysesCsv,
-  getDeviationStats,
 } from '../controllers/archiveController';
 
 const router = Router();
@@ -20,8 +19,5 @@ router.get('/trend', getTrendData as any);
 
 // GET /api/archive/export/csv - Eksport analiz do CSV
 router.get('/export/csv', exportAnalysesCsv as any);
-
-// GET /api/archive/deviations - Statystyki odchylen
-router.get('/deviations', getDeviationStats as any);
 
 export default router;

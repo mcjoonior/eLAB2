@@ -24,8 +24,6 @@ import { useAuthStore } from '@/store/authStore';
 import {
   getAnalysisStatusColor,
   getAnalysisStatusLabel,
-  getAnalysisTypeLabel,
-  getAnalysisTypeColor,
   getDeviationColor,
   getDeviationBadgeColor,
   getDeviationLabel,
@@ -40,7 +38,6 @@ import type {
   Analysis,
   AnalysisResult,
   AnalysisStatus,
-  AnalysisType,
   Recommendation,
   Deviation,
   Priority,
@@ -55,13 +52,22 @@ interface NewResultRow {
   parameterName: string;
   unit: string;
   value: string;
+  measurementUncertainty: string;
   minReference: string;
   maxReference: string;
   optimalReference: string;
 }
 
 function emptyRow(): NewResultRow {
-  return { parameterName: '', unit: '', value: '', minReference: '', maxReference: '', optimalReference: '' };
+  return {
+    parameterName: '',
+    unit: '',
+    value: '',
+    measurementUncertainty: '',
+    minReference: '',
+    maxReference: '',
+    optimalReference: '',
+  };
 }
 
 function makeResultKey(parameterName: string, unit: string): string {
@@ -177,6 +183,7 @@ export default function AnalysisDetailPage() {
             parameterName: p.parameterName,
             unit: p.unit,
             value: saved?.value != null ? String(saved.value) : '',
+            measurementUncertainty: saved?.measurementUncertainty != null ? String(saved.measurementUncertainty) : '',
             minReference: saved?.minReference != null
               ? String(saved.minReference)
               : (p.minValue != null ? String(p.minValue) : ''),
@@ -213,6 +220,7 @@ export default function AnalysisDetailPage() {
                 parameterName: r.parameterName,
                 unit: r.unit,
                 value: r.value != null ? String(r.value) : '',
+                measurementUncertainty: r.measurementUncertainty != null ? String(r.measurementUncertainty) : '',
                 minReference: r.minReference != null ? String(r.minReference) : '',
                 maxReference: r.maxReference != null ? String(r.maxReference) : '',
                 optimalReference: r.optimalReference != null ? String(r.optimalReference) : '',
@@ -276,6 +284,7 @@ export default function AnalysisDetailPage() {
         parameterName: r.parameterName,
         unit: r.unit,
         value: resultValues[r.id] ? parseFloat(resultValues[r.id]) : r.value,
+        measurementUncertainty: r.measurementUncertainty,
         minReference: r.minReference,
         maxReference: r.maxReference,
         optimalReference: r.optimalReference,
@@ -307,6 +316,7 @@ export default function AnalysisDetailPage() {
         parameterName: r.parameterName,
         unit: r.unit,
         value: parseFloat(r.value),
+        measurementUncertainty: r.measurementUncertainty ? parseFloat(r.measurementUncertainty) : undefined,
         minReference: r.minReference ? parseFloat(r.minReference) : undefined,
         maxReference: r.maxReference ? parseFloat(r.maxReference) : undefined,
         optimalReference: r.optimalReference ? parseFloat(r.optimalReference) : undefined,
@@ -511,9 +521,6 @@ export default function AnalysisDetailPage() {
               <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${getAnalysisStatusColor(analysis.status)}`}>
                 {getAnalysisStatusLabel(analysis.status)}
               </span>
-              <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${getAnalysisTypeColor(analysis.analysisType)}`}>
-                {getAnalysisTypeLabel(analysis.analysisType)}
-              </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
@@ -526,7 +533,16 @@ export default function AnalysisDetailPage() {
               <div>
                 <span className="text-gray-500 dark:text-gray-400">Klient:</span>
                 <p className="font-medium text-gray-900 dark:text-white">
-                  {analysis.sample?.client?.companyName || '-'}
+                  {analysis.sample?.client?.id ? (
+                    <button
+                      onClick={() => navigate(`/clients/${analysis.sample!.client!.id}`)}
+                      className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                    >
+                      {analysis.sample.client.companyName}
+                    </button>
+                  ) : (
+                    '-'
+                  )}
                 </p>
               </div>
               <div>
@@ -682,10 +698,11 @@ export default function AnalysisDetailPage() {
                       <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                         <th className="text-left px-3 py-2 font-medium text-gray-700 dark:text-gray-300">Parametr</th>
                         <th className="text-left px-3 py-2 font-medium text-gray-700 dark:text-gray-300">Jednostka</th>
-                        <th className="text-right px-3 py-2 font-medium text-gray-700 dark:text-gray-300">Wartość *</th>
-                        <th className="text-right px-3 py-2 font-medium text-gray-700 dark:text-gray-300">Min</th>
-                        <th className="text-right px-3 py-2 font-medium text-gray-700 dark:text-gray-300">Max</th>
-                        <th className="text-right px-3 py-2 font-medium text-gray-700 dark:text-gray-300">Optimum</th>
+                        <th className="px-3 py-2 font-medium text-gray-700 dark:text-gray-300 text-center">Wartość *</th>
+                        <th className="px-3 py-2 font-medium text-gray-700 dark:text-gray-300 text-center">Niepewność</th>
+                        <th className="px-3 py-2 font-medium text-gray-700 dark:text-gray-300 text-center">Min</th>
+                        <th className="px-3 py-2 font-medium text-gray-700 dark:text-gray-300 text-center">Max</th>
+                        <th className="px-3 py-2 font-medium text-gray-700 dark:text-gray-300 text-center">Optimum</th>
                         <th className="px-3 py-2 w-10"></th>
                       </tr>
                     </thead>
@@ -710,41 +727,51 @@ export default function AnalysisDetailPage() {
                               className="w-20 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none"
                             />
                           </td>
-                          <td className="px-3 py-2">
+                          <td className="px-3 py-2 text-center">
                             <input
                               type="number"
                               step="any"
                               value={row.value}
                               onChange={(e) => updateNewResult(idx, 'value', e.target.value)}
                               placeholder="0.00"
-                              className="w-24 text-right rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none"
+                              className="w-24 mx-auto text-right rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none"
                             />
                           </td>
-                          <td className="px-3 py-2">
+                          <td className="px-3 py-2 text-center">
+                            <input
+                              type="number"
+                              step="any"
+                              value={row.measurementUncertainty}
+                              onChange={(e) => updateNewResult(idx, 'measurementUncertainty', e.target.value)}
+                              placeholder="±0.00"
+                              className="w-24 mx-auto text-right rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none"
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-center">
                             <input
                               type="number"
                               step="any"
                               value={row.minReference}
                               onChange={(e) => updateNewResult(idx, 'minReference', e.target.value)}
-                              className="w-20 text-right rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none"
+                              className="w-20 mx-auto text-right rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none"
                             />
                           </td>
-                          <td className="px-3 py-2">
+                          <td className="px-3 py-2 text-center">
                             <input
                               type="number"
                               step="any"
                               value={row.maxReference}
                               onChange={(e) => updateNewResult(idx, 'maxReference', e.target.value)}
-                              className="w-20 text-right rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none"
+                              className="w-20 mx-auto text-right rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none"
                             />
                           </td>
-                          <td className="px-3 py-2">
+                          <td className="px-3 py-2 text-center">
                             <input
                               type="number"
                               step="any"
                               value={row.optimalReference}
                               onChange={(e) => updateNewResult(idx, 'optimalReference', e.target.value)}
-                              className="w-20 text-right rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none"
+                              className="w-20 mx-auto text-right rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none"
                             />
                           </td>
                           <td className="px-3 py-2">
@@ -799,10 +826,11 @@ export default function AnalysisDetailPage() {
                   <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                     <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Parametr</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Jednostka</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Wartość</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Min</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Max</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Optimum</th>
+                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300 text-center">Wartość</th>
+                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300 text-center">Niepewność</th>
+                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300 text-center">Min</th>
+                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300 text-center">Max</th>
+                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300 text-center">Optimum</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Odchylenie</th>
                     <th className="text-right px-4 py-3 font-medium text-gray-700 dark:text-gray-300">%</th>
                   </tr>
@@ -838,6 +866,9 @@ export default function AnalysisDetailPage() {
                             {formatNumber(result.value)}
                           </span>
                         )}
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
+                        {result.measurementUncertainty != null ? `±${formatNumber(result.measurementUncertainty)}` : '-'}
                       </td>
                       <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
                         {result.minReference != null ? formatNumber(result.minReference) : '-'}

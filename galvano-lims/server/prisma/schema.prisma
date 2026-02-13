@@ -270,6 +270,7 @@ model AnalysisResult {
   parameterName    String
   unit             String
   value            Decimal   @db.Decimal(12, 4)
+  measurementUncertainty Decimal?  @db.Decimal(12, 4)
   minReference     Decimal?  @db.Decimal(12, 4)
   maxReference     Decimal?  @db.Decimal(12, 4)
   optimalReference Decimal?  @db.Decimal(12, 4)

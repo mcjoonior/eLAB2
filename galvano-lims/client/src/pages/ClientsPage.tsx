@@ -409,8 +409,13 @@ export default function ClientsPage() {
                       key={client.id}
                       className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                     >
-                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
-                        {client.companyName}
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => navigate(`/clients/${client.id}`)}
+                          className="block w-full text-right font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                        >
+                          {client.companyName}
+                        </button>
                       </td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
                         {client.nip || '-'}

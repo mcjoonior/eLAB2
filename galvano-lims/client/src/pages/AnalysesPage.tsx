@@ -12,10 +12,7 @@ import {
   getAnalysisStatusLabel,
   formatDate,
 } from '@/utils/helpers';
-import { getAnalysisTypeLabel, getAnalysisTypeColor } from '@/utils/helpers';
-import type { Analysis, Sample, AnalysisStatus, AnalysisType } from '@/types';
-
-const ANALYSIS_TYPES: AnalysisType[] = ['CHEMICAL', 'CORROSION_TEST', 'SURFACE_ANALYSIS'];
+import type { Analysis, Sample, AnalysisStatus } from '@/types';
 
 const ANALYSIS_STATUSES: AnalysisStatus[] = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'APPROVED', 'REJECTED'];
 
@@ -44,7 +41,7 @@ export default function AnalysesPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [samples, setSamples] = useState<Sample[]>([]);
   const [samplesLoading, setSamplesLoading] = useState(false);
-  const [newAnalysis, setNewAnalysis] = useState({ sampleId: '', analysisType: 'CHEMICAL' as AnalysisType, notes: '' });
+  const [newAnalysis, setNewAnalysis] = useState({ sampleId: '', notes: '' });
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState('');
   const [confirmDeleteAnalysis, setConfirmDeleteAnalysis] = useState<Analysis | null>(null);
@@ -77,7 +74,7 @@ export default function AnalysesPage() {
   async function openCreateDialog() {
     setShowCreateDialog(true);
     setCreateError('');
-    setNewAnalysis({ sampleId: '', analysisType: 'CHEMICAL', notes: '' });
+    setNewAnalysis({ sampleId: '', notes: '' });
     setSamplesLoading(true);
     try {
       const res = await sampleService.getAll({ limit: 200, status: 'REGISTERED' });
@@ -100,7 +97,6 @@ export default function AnalysesPage() {
     try {
       await analysisService.create({
         sampleId: newAnalysis.sampleId,
-        analysisType: newAnalysis.analysisType,
         notes: newAnalysis.notes || undefined,
       });
       setShowCreateDialog(false);
@@ -219,7 +215,6 @@ export default function AnalysesPage() {
                   <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Próbka</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Klient</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Proces</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Typ</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Status</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Data</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Wykonał</th>
@@ -239,16 +234,23 @@ export default function AnalysesPage() {
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                       {analysis.sample?.sampleCode || '-'}
                     </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                      {analysis.sample?.client?.companyName || '-'}
+                    <td className="px-4 py-3 text-right">
+                      {analysis.sample?.client?.id ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/clients/${analysis.sample!.client!.id}`);
+                          }}
+                          className="block w-full text-right font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                        >
+                          {analysis.sample.client.companyName}
+                        </button>
+                      ) : (
+                        '-'
+                      )}
                     </td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                       {analysis.sample?.process?.name || '-'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${getAnalysisTypeColor(analysis.analysisType)}`}>
-                        {getAnalysisTypeLabel(analysis.analysisType)}
-                      </span>
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getAnalysisStatusColor(analysis.status)}`}>
@@ -372,21 +374,6 @@ export default function AnalysesPage() {
                     ))}
                   </select>
                 )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                  Typ analizy
-                </label>
-                <select
-                  value={newAnalysis.analysisType}
-                  onChange={(e) => setNewAnalysis({ ...newAnalysis, analysisType: e.target.value as AnalysisType })}
-                  className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
-                >
-                  {ANALYSIS_TYPES.map((at) => (
-                    <option key={at} value={at}>{getAnalysisTypeLabel(at)}</option>
-                  ))}
-                </select>
               </div>
 
               <div>

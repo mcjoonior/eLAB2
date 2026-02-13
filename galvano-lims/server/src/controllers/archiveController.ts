@@ -161,6 +161,7 @@ export const getTrendData = async (req: AuthenticatedRequest, res: Response, nex
       clientId,
       dateFrom,
       dateTo,
+      includeDrafts,
       limit = '100',
     } = req.query as Record<string, string | undefined>;
 
@@ -174,7 +175,9 @@ export const getTrendData = async (req: AuthenticatedRequest, res: Response, nex
     const where: Prisma.AnalysisResultWhereInput = {
       parameterName: { equals: parameterName as string, mode: 'insensitive' },
       analysis: {
-        status: { in: ['COMPLETED', 'APPROVED'] },
+        status: includeDrafts === 'true'
+          ? { in: ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'APPROVED'] }
+          : { in: ['COMPLETED', 'APPROVED'] },
       },
     };
 
@@ -331,6 +334,7 @@ export const exportAnalysesCsv = async (req: AuthenticatedRequest, res: Response
       'Zatwierdzil',
       'Parametr',
       'Wartosc',
+      'Niepewnosc pomiaru',
       'Jednostka',
       'Min',
       'Max',
@@ -356,6 +360,7 @@ export const exportAnalysesCsv = async (req: AuthenticatedRequest, res: Response
           `${analysis.performer.firstName} ${analysis.performer.lastName}`,
           analysis.approver ? `${analysis.approver.firstName} ${analysis.approver.lastName}` : '',
           '', '', '', '', '', '', '', '',
+          '',
           analysis.notes ?? '',
         ].join(';'));
       }
@@ -374,6 +379,7 @@ export const exportAnalysesCsv = async (req: AuthenticatedRequest, res: Response
           analysis.approver ? `${analysis.approver.firstName} ${analysis.approver.lastName}` : '',
           result.parameterName,
           result.value.toString(),
+          result.measurementUncertainty?.toString() ?? '',
           result.unit,
           result.minReference?.toString() ?? '',
           result.maxReference?.toString() ?? '',

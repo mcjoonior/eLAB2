@@ -3,8 +3,6 @@ import { useTranslation } from 'react-i18next';
 import {
   LineChart,
   Line,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -18,10 +16,9 @@ import {
   RotateCcw,
   Download,
   TrendingUp,
-  BarChart3,
   Table as TableIcon,
 } from 'lucide-react';
-import { archiveService, type ArchiveAnalysisRow, type DeviationData } from '@/services/archiveService';
+import { archiveService, type ArchiveAnalysisRow } from '@/services/archiveService';
 import { clientService } from '@/services/clientService';
 import { processService } from '@/services/processService';
 import type {
@@ -40,7 +37,7 @@ import {
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Pagination } from '@/components/common/Pagination';
 
-type TabKey = 'trend' | 'deviations' | 'table';
+type TabKey = 'trend' | 'table';
 
 interface Filters {
   clientId: string;
@@ -72,7 +69,6 @@ export default function ArchivePage() {
 
   // --- Data ---
   const [trendData, setTrendData] = useState<TrendDataPoint[]>([]);
-  const [deviationData, setDeviationData] = useState<DeviationData[]>([]);
   const [analyses, setAnalyses] = useState<ArchiveAnalysisRow[]>([]);
   const [pagination, setPagination] = useState({
     page: 1,
@@ -150,9 +146,6 @@ export default function ArchivePage() {
             params as { parameterName: string } & typeof params,
           );
           setTrendData(data);
-        } else if (activeTab === 'deviations') {
-          const data = await archiveService.getDeviations(params);
-          setDeviationData(data);
         } else if (activeTab === 'table') {
           const res = await archiveService.getAnalyses({
             ...params,
@@ -187,7 +180,6 @@ export default function ArchivePage() {
     setFilters(INITIAL_FILTERS);
     setParameters([]);
     setTrendData([]);
-    setDeviationData([]);
     setAnalyses([]);
   }
 
@@ -240,7 +232,6 @@ export default function ArchivePage() {
   // -------------------------------------------------------
   const tabs: { key: TabKey; label: string; icon: typeof TrendingUp }[] = [
     { key: 'trend', label: 'Trend', icon: TrendingUp },
-    { key: 'deviations', label: t('archive.deviations'), icon: BarChart3 },
     { key: 'table', label: 'Tabela', icon: TableIcon },
   ];
 
@@ -534,78 +525,6 @@ export default function ArchivePage() {
           </div>
         )}
 
-        {/* =================== DEVIATIONS TAB =================== */}
-        {!loading && activeTab === 'deviations' && (
-          <div className="p-6">
-            {deviationData.length === 0 ? (
-              <div className="text-center py-12 text-sm text-gray-500 dark:text-gray-400">
-                {t('common.noData')}
-              </div>
-            ) : (
-              <>
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
-                  {t('archive.deviations')}
-                </h3>
-                <div className="w-full h-[400px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={deviationData}
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis
-                        dataKey="parameterName"
-                        tick={{ fontSize: 12 }}
-                        stroke="#9ca3af"
-                      />
-                      <YAxis tick={{ fontSize: 12 }} stroke="#9ca3af" />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#fff',
-                          border: '1px solid #e5e7eb',
-                          borderRadius: '8px',
-                          fontSize: '12px',
-                        }}
-                      />
-                      <Legend />
-                      <Bar
-                        dataKey="withinRange"
-                        name="W normie"
-                        fill="#16a34a"
-                        stackId="stack"
-                      />
-                      <Bar
-                        dataKey="belowMin"
-                        name="Poniżej min"
-                        fill="#eab308"
-                        stackId="stack"
-                      />
-                      <Bar
-                        dataKey="aboveMax"
-                        name="Powyżej max"
-                        fill="#f59e0b"
-                        stackId="stack"
-                      />
-                      <Bar
-                        dataKey="criticalLow"
-                        name="Krytycznie niski"
-                        fill="#dc2626"
-                        stackId="stack"
-                      />
-                      <Bar
-                        dataKey="criticalHigh"
-                        name="Krytycznie wysoki"
-                        fill="#991b1b"
-                        stackId="stack"
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
         {/* ===================== TABLE TAB ====================== */}
         {!loading && activeTab === 'table' && (
           <div className="p-6">
@@ -653,6 +572,9 @@ export default function ArchivePage() {
                           {t('analyses.value')}
                         </th>
                         <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Niepewność
+                        </th>
+                        <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                           {t('analyses.min')}
                         </th>
                         <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -686,6 +608,9 @@ export default function ArchivePage() {
                           </td>
                           <td className="px-4 py-3 text-right font-mono text-gray-900 dark:text-white whitespace-nowrap">
                             {formatNumber(row.value)}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                            {row.measurementUncertainty != null ? `±${formatNumber(row.measurementUncertainty)}` : '—'}
                           </td>
                           <td className="px-4 py-3 text-right font-mono text-gray-500 dark:text-gray-400 whitespace-nowrap">
                             {row.min != null ? formatNumber(row.min) : '—'}

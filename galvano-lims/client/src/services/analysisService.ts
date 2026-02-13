@@ -1,5 +1,5 @@
 import api from './api';
-import type { Analysis, AnalysisResult, AnalysisAttachment, Recommendation, PaginatedResponse, AnalysisStatus, AnalysisType } from '@/types';
+import type { Analysis, AnalysisResult, AnalysisAttachment, Recommendation, PaginatedResponse, AnalysisStatus } from '@/types';
 
 export const analysisService = {
   async getAll(params?: {
@@ -15,7 +15,7 @@ export const analysisService = {
     return response.data;
   },
 
-  async create(data: { sampleId: string; analysisType?: AnalysisType; notes?: string }): Promise<Analysis> {
+  async create(data: { sampleId: string; notes?: string }): Promise<Analysis> {
     const response = await api.post('/analyses', data);
     return response.data;
   },

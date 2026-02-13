@@ -9,18 +9,10 @@ export interface ArchiveAnalysisRow {
   processName: string;
   parameterName: string;
   value: number;
+  measurementUncertainty?: number;
   min?: number;
   max?: number;
   deviation: Deviation;
-}
-
-export interface DeviationData {
-  parameterName: string;
-  withinRange: number;
-  belowMin: number;
-  aboveMax: number;
-  criticalLow: number;
-  criticalHigh: number;
 }
 
 export const archiveService = {
@@ -48,6 +40,7 @@ export const archiveService = {
             ...base,
             parameterName: r.parameterName,
             value: Number(r.value),
+            measurementUncertainty: r.measurementUncertainty != null ? Number(r.measurementUncertainty) : undefined,
             min: r.minReference != null ? Number(r.minReference) : undefined,
             max: r.maxReference != null ? Number(r.maxReference) : undefined,
             deviation: r.deviation,
@@ -72,7 +65,7 @@ export const archiveService = {
 
   async getTrend(params: {
     clientId?: string; processId?: string; parameterName: string;
-    dateFrom?: string; dateTo?: string;
+    dateFrom?: string; dateTo?: string; includeDrafts?: boolean;
   }): Promise<TrendDataPoint[]> {
     const response = await api.get('/archive/trend', { params });
     const raw = response.data;
@@ -81,28 +74,10 @@ export const archiveService = {
     // Transform dataPoints to TrendDataPoint[]
     return (raw.dataPoints || []).map((dp: any) => ({
       date: dp.analysis?.analysisDate || '',
-      value: Number(dp.value),
+      value: typeof dp.value === 'number' ? dp.value : Number(dp.value),
       min: dp.minReference != null ? Number(dp.minReference) : undefined,
       max: dp.maxReference != null ? Number(dp.maxReference) : undefined,
       optimal: dp.optimalReference != null ? Number(dp.optimalReference) : undefined,
-    }));
-  },
-
-  async getDeviations(params?: {
-    clientId?: string; processId?: string; dateFrom?: string; dateTo?: string;
-  }): Promise<DeviationData[]> {
-    const response = await api.get('/archive/deviations', { params });
-    const raw = response.data;
-
-    // Backend returns { summary, parameterBreakdown }
-    // Transform parameterBreakdown to DeviationData[]
-    return (raw.parameterBreakdown || []).map((p: any) => ({
-      parameterName: p.parameterName,
-      withinRange: p.deviations?.WITHIN_RANGE || 0,
-      belowMin: p.deviations?.BELOW_MIN || 0,
-      aboveMax: p.deviations?.ABOVE_MAX || 0,
-      criticalLow: p.deviations?.CRITICAL_LOW || 0,
-      criticalHigh: p.deviations?.CRITICAL_HIGH || 0,
     }));
   },
 
