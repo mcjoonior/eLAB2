@@ -22,12 +22,51 @@ const processParameterSchema = z.object({
 const createProcessSchema = z.object({
   name: z.string().min(2, 'Nazwa procesu musi mieć co najmniej 2 znaki'),
   description: z.string().optional().nullable(),
-  processType: z.enum(['ZINC', 'NICKEL', 'CHROME', 'COPPER', 'TIN', 'GOLD', 'SILVER', 'ANODIZING', 'PASSIVATION', 'OTHER']),
+  processType: z.string().min(1, 'Typ procesu jest wymagany'),
   clientId: z.string().uuid().optional().nullable(),
   parameters: z.array(processParameterSchema).optional().default([]),
 });
 
 const updateProcessSchema = createProcessSchema.partial();
+const createProcessTypeSchema = z.object({
+  code: z.string().min(2, 'Kod typu jest wymagany').max(40, 'Kod typu może mieć maksymalnie 40 znaków'),
+  name: z.string().min(2, 'Nazwa typu jest wymagana').max(80, 'Nazwa typu może mieć maksymalnie 80 znaków'),
+  isActive: z.boolean().optional().default(true),
+  sortOrder: z.number().int().optional().default(0),
+});
+const updateProcessTypeSchema = createProcessTypeSchema.partial();
+
+const DEFAULT_PROCESS_TYPES: Array<{ code: string; name: string; sortOrder: number }> = [
+  { code: 'ZINC', name: 'Cynkowanie', sortOrder: 1 },
+  { code: 'NICKEL', name: 'Niklowanie', sortOrder: 2 },
+  { code: 'CHROME', name: 'Chromowanie', sortOrder: 3 },
+  { code: 'COPPER', name: 'Miedziowanie', sortOrder: 4 },
+  { code: 'TIN', name: 'Cynowanie', sortOrder: 5 },
+  { code: 'GOLD', name: 'Złocenie', sortOrder: 6 },
+  { code: 'SILVER', name: 'Srebrzenie', sortOrder: 7 },
+  { code: 'ANODIZING', name: 'Anodowanie', sortOrder: 8 },
+  { code: 'PASSIVATION', name: 'Pasywacja', sortOrder: 9 },
+  { code: 'OTHER', name: 'Inne', sortOrder: 10 },
+];
+
+function normalizeTypeCode(code: string): string {
+  return code.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+}
+
+async function ensureDefaultProcessTypes() {
+  const count = await prisma.processTypeDefinition.count();
+  if (count > 0) return;
+
+  await prisma.processTypeDefinition.createMany({
+    data: DEFAULT_PROCESS_TYPES.map((t) => ({
+      code: t.code,
+      name: t.name,
+      isActive: true,
+      sortOrder: t.sortOrder,
+    })),
+    skipDuplicates: true,
+  });
+}
 
 // ============================================================
 // GET / - Lista procesów z filtrami
@@ -35,6 +74,8 @@ const updateProcessSchema = createProcessSchema.partial();
 
 export const getProcesses = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
+    await ensureDefaultProcessTypes();
+
     const {
       processType,
       isActive,
@@ -114,6 +155,199 @@ export const getProcesses = async (req: AuthenticatedRequest, res: Response, nex
 };
 
 // ============================================================
+// GET /types - Lista typów procesów
+// ============================================================
+
+export const getProcessTypes = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    await ensureDefaultProcessTypes();
+    const { all } = req.query as Record<string, string | undefined>;
+    const where = all === 'true' ? {} : { isActive: true };
+
+    const types = await prisma.processTypeDefinition.findMany({
+      where,
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    });
+
+    res.json(types);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================
+// POST /types - Dodanie typu procesu
+// ============================================================
+
+export const createProcessType = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const validation = createProcessTypeSchema.safeParse(req.body);
+    if (!validation.success) {
+      res.status(400).json({
+        error: 'Błąd walidacji danych',
+        details: validation.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    const data = validation.data;
+    const code = normalizeTypeCode(data.code);
+
+    const duplicate = await prisma.processTypeDefinition.findFirst({
+      where: {
+        OR: [
+          { code: { equals: code, mode: 'insensitive' } },
+          { name: { equals: data.name.trim(), mode: 'insensitive' } },
+        ],
+      },
+    });
+    if (duplicate) {
+      res.status(409).json({ error: 'Typ procesu o podanym kodzie lub nazwie już istnieje.' });
+      return;
+    }
+
+    const created = await prisma.processTypeDefinition.create({
+      data: {
+        code,
+        name: data.name.trim(),
+        isActive: data.isActive ?? true,
+        sortOrder: data.sortOrder ?? 0,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.userId,
+        action: 'CREATE',
+        entityType: 'SETTINGS',
+        entityId: created.id,
+        details: { module: 'process-types', code: created.code, name: created.name },
+      },
+    });
+
+    res.status(201).json(created);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================
+// PUT /types/:id - Edycja typu procesu
+// ============================================================
+
+export const updateProcessType = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const validation = updateProcessTypeSchema.safeParse(req.body);
+    if (!validation.success) {
+      res.status(400).json({
+        error: 'Błąd walidacji danych',
+        details: validation.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    const existing = await prisma.processTypeDefinition.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Typ procesu nie został znaleziony.' });
+      return;
+    }
+
+    const input = validation.data;
+    const nextCode = input.code ? normalizeTypeCode(input.code) : existing.code;
+    const nextName = input.name ? input.name.trim() : existing.name;
+
+    const duplicate = await prisma.processTypeDefinition.findFirst({
+      where: {
+        id: { not: id },
+        OR: [
+          { code: { equals: nextCode, mode: 'insensitive' } },
+          { name: { equals: nextName, mode: 'insensitive' } },
+        ],
+      },
+    });
+    if (duplicate) {
+      res.status(409).json({ error: 'Typ procesu o podanym kodzie lub nazwie już istnieje.' });
+      return;
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      if (nextCode !== existing.code) {
+        await tx.process.updateMany({
+          where: { processType: existing.code },
+          data: { processType: nextCode },
+        });
+      }
+
+      return tx.processTypeDefinition.update({
+        where: { id },
+        data: {
+          code: nextCode,
+          name: nextName,
+          isActive: input.isActive ?? existing.isActive,
+          sortOrder: input.sortOrder ?? existing.sortOrder,
+        },
+      });
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.userId,
+        action: 'UPDATE',
+        entityType: 'SETTINGS',
+        entityId: updated.id,
+        details: { module: 'process-types', previousCode: existing.code, code: updated.code, name: updated.name },
+      },
+    });
+
+    res.json(updated);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================
+// DELETE /types/:id - Usunięcie typu procesu
+// ============================================================
+
+export const deleteProcessType = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.processTypeDefinition.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Typ procesu nie został znaleziony.' });
+      return;
+    }
+
+    const usedCount = await prisma.process.count({
+      where: { processType: existing.code },
+    });
+    if (usedCount > 0) {
+      res.status(409).json({
+        error: `Nie można usunąć typu procesu, bo jest używany w ${usedCount} procesach.`,
+      });
+      return;
+    }
+
+    await prisma.processTypeDefinition.delete({ where: { id } });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.userId,
+        action: 'DELETE',
+        entityType: 'SETTINGS',
+        entityId: id,
+        details: { module: 'process-types', code: existing.code, name: existing.name },
+      },
+    });
+
+    res.json({ message: 'Typ procesu został usunięty.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================
 // GET /:id - Szczegóły procesu z parametrami
 // ============================================================
 
@@ -153,6 +387,8 @@ export const getProcessById = async (req: AuthenticatedRequest, res: Response, n
 
 export const createProcess = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
+    await ensureDefaultProcessTypes();
+
     const validation = createProcessSchema.safeParse(req.body);
     if (!validation.success) {
       res.status(400).json({
@@ -163,10 +399,20 @@ export const createProcess = async (req: AuthenticatedRequest, res: Response, ne
     }
 
     const { parameters, ...processData } = validation.data;
+    const processTypeCode = normalizeTypeCode(processData.processType);
+
+    const processType = await prisma.processTypeDefinition.findFirst({
+      where: { code: { equals: processTypeCode, mode: 'insensitive' }, isActive: true },
+    });
+    if (!processType) {
+      res.status(400).json({ error: 'Wybrany typ procesu nie istnieje lub jest nieaktywny.' });
+      return;
+    }
 
     const process = await (prisma.process.create as any)({
       data: {
         ...processData,
+        processType: processType.code,
         parameters: {
           create: parameters.map((p: any, index: number) => ({
             parameterName: p.parameterName,
@@ -206,6 +452,8 @@ export const createProcess = async (req: AuthenticatedRequest, res: Response, ne
 
 export const updateProcess = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
+    await ensureDefaultProcessTypes();
+
     const { id } = req.params;
 
     const validation = updateProcessSchema.safeParse(req.body);
@@ -224,6 +472,17 @@ export const updateProcess = async (req: AuthenticatedRequest, res: Response, ne
     }
 
     const { parameters, ...processData } = validation.data;
+    if (processData.processType) {
+      const processTypeCode = normalizeTypeCode(processData.processType);
+      const processType = await prisma.processTypeDefinition.findFirst({
+        where: { code: { equals: processTypeCode, mode: 'insensitive' } },
+      });
+      if (!processType) {
+        res.status(400).json({ error: 'Wybrany typ procesu nie istnieje.' });
+        return;
+      }
+      processData.processType = processType.code;
+    }
 
     // Aktualizacja procesu i parametrów w transakcji
     const process = await prisma.$transaction(async (tx) => {

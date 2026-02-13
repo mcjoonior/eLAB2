@@ -1,6 +1,24 @@
 import api from './api';
 import type { Client, PaginatedResponse } from '@/types';
 
+export interface GusLookupResponse {
+  source: 'GUS';
+  data: {
+    companyName: string;
+    nip: string;
+    address: string;
+    city: string;
+    postalCode: string;
+    country: string;
+  };
+  meta?: {
+    regon?: string;
+    krs?: string;
+    type?: string;
+    silosId?: string;
+  };
+}
+
 export const clientService = {
   async getAll(params?: { page?: number; limit?: number; search?: string; isActive?: boolean | 'all' }): Promise<PaginatedResponse<Client>> {
     const response = await api.get('/clients', { params });
@@ -14,6 +32,11 @@ export const clientService = {
 
   async create(data: Partial<Client>): Promise<Client> {
     const response = await api.post('/clients', data);
+    return response.data;
+  },
+
+  async lookupByNipInGus(nip: string): Promise<GusLookupResponse> {
+    const response = await api.post('/clients/lookup-gus', { nip });
     return response.data;
   },
 

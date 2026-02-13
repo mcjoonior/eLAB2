@@ -1,16 +1,25 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { processService } from '@/services/processService';
 import { getProcessTypeLabel, formatDate, formatNumber } from '@/utils/helpers';
-import type { Process, ProcessType } from '@/types';
+import type { Process, ProcessType, ProcessTypeDefinition } from '@/types';
 
-const PROCESS_TYPES: ProcessType[] = [
-  'ZINC', 'NICKEL', 'CHROME', 'COPPER', 'TIN',
-  'GOLD', 'SILVER', 'ANODIZING', 'PASSIVATION', 'OTHER',
-];
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (
+    error &&
+    typeof error === 'object' &&
+    'response' in error &&
+    (error as any).response?.data?.error &&
+    typeof (error as any).response.data.error === 'string'
+  ) {
+    return (error as any).response.data.error;
+  }
+
+  return fallback;
+}
 
 interface ParameterRow {
   id?: string;
@@ -31,20 +40,55 @@ export default function ProcessDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const [processTypes, setProcessTypes] = useState<ProcessTypeDefinition[]>([]);
+
   // Edit state
   const [editing, setEditing] = useState(false);
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
-  const [formProcessType, setFormProcessType] = useState<ProcessType>('ZINC');
+  const [formProcessType, setFormProcessType] = useState<ProcessType>('');
   const [formParameters, setFormParameters] = useState<ParameterRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [saveSuccess, setSaveSuccess] = useState('');
 
+  const processTypeLabels = useMemo(
+    () => Object.fromEntries(processTypes.map((type) => [type.code, type.name])),
+    [processTypes]
+  );
+
+  const selectableProcessTypes = useMemo(() => {
+    const activeTypes = processTypes.filter((type) => type.isActive);
+    if (formProcessType && !activeTypes.some((type) => type.code === formProcessType)) {
+      const current = processTypes.find((type) => type.code === formProcessType);
+      if (current) {
+        return [...activeTypes, current].sort((a, b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name));
+      }
+    }
+
+    return activeTypes.sort((a, b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name));
+  }, [formProcessType, processTypes]);
+
+  function getTypeLabel(code: string): string {
+    return processTypeLabels[code] || getProcessTypeLabel(code);
+  }
+
   useEffect(() => {
-    if (id) fetchProcess();
+    if (id) {
+      fetchProcess();
+      fetchTypes();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  async function fetchTypes() {
+    try {
+      const types = await processService.getTypes({ all: true });
+      setProcessTypes(types);
+    } catch {
+      // Ignore type loading error here; process details can still be displayed.
+    }
+  }
 
   async function fetchProcess() {
     setLoading(true);
@@ -113,6 +157,11 @@ export default function ProcessDetailPage() {
       setSaveError('Nazwa procesu jest wymagana.');
       return;
     }
+    if (!formProcessType) {
+      setSaveError('Typ procesu jest wymagany.');
+      return;
+    }
+
     setSaving(true);
     setSaveError('');
     setSaveSuccess('');
@@ -139,8 +188,8 @@ export default function ProcessDetailPage() {
       setEditing(false);
       setSaveSuccess('Proces został zapisany pomyślnie.');
       setTimeout(() => setSaveSuccess(''), 3000);
-    } catch {
-      setSaveError('Nie udało się zapisać zmian. Spróbuj ponownie.');
+    } catch (err) {
+      setSaveError(getErrorMessage(err, 'Nie udało się zapisać zmian. Spróbuj ponownie.'));
     } finally {
       setSaving(false);
     }
@@ -198,7 +247,7 @@ export default function ProcessDetailPage() {
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{process.name}</h1>
             <div className="mt-2 flex items-center gap-3">
               <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                {getProcessTypeLabel(process.processType)}
+                {getTypeLabel(process.processType)}
               </span>
               <span className="text-sm text-gray-500 dark:text-gray-400">
                 Utworzono: {formatDate(process.createdAt)}
@@ -258,9 +307,10 @@ export default function ProcessDetailPage() {
                 value={formProcessType}
                 onChange={(e) => setFormProcessType(e.target.value as ProcessType)}
                 className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                required
               >
-                {PROCESS_TYPES.map((pt) => (
-                  <option key={pt} value={pt}>{getProcessTypeLabel(pt)}</option>
+                {selectableProcessTypes.map((pt) => (
+                  <option key={pt.id} value={pt.code}>{pt.name}</option>
                 ))}
               </select>
             </div>

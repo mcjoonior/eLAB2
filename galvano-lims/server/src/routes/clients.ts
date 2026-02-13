@@ -4,6 +4,7 @@ import {
   getClients,
   getClientById,
   createClient,
+  lookupClientInGus,
   updateClient,
   deleteClient,
   permanentlyDeleteClient,
@@ -18,6 +19,7 @@ router.use(authenticateToken as any);
 
 router.get('/', getClients as any);
 router.get('/export/csv', exportClientsCsv as any);
+router.post('/lookup-gus', lookupClientInGus as any);
 router.get('/:id', getClientById as any);
 router.post('/', createClient as any);
 router.put('/:id', updateClient as any);

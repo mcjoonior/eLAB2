@@ -2,7 +2,6 @@ import { prisma } from '../index';
 import {
   ImportStatus,
   ImportType,
-  ProcessType,
   SampleType,
   SampleStatus,
   AnalysisStatus,
@@ -113,36 +112,54 @@ const TARGET_FIELDS_ALIASES: Record<string, string[]> = {
   'result.maxReference': ['max', 'maksimum', 'górna granica', 'wartość max'],
 };
 
+const PROCESS_TYPE_CODES = [
+  'ZINC',
+  'NICKEL',
+  'CHROME',
+  'COPPER',
+  'TIN',
+  'GOLD',
+  'SILVER',
+  'ANODIZING',
+  'PASSIVATION',
+  'OTHER',
+] as const;
+
+type ProcessTypeCode = (typeof PROCESS_TYPE_CODES)[number];
+
 /** Mapowanie typów procesów z polskich nazw */
-const PROCESS_TYPE_MAP: Record<string, ProcessType> = {
-  'cynkowanie': ProcessType.ZINC,
-  'cynk': ProcessType.ZINC,
-  'zinc': ProcessType.ZINC,
-  'niklowanie': ProcessType.NICKEL,
-  'nikiel': ProcessType.NICKEL,
-  'nickel': ProcessType.NICKEL,
-  'chromowanie': ProcessType.CHROME,
-  'chrom': ProcessType.CHROME,
-  'chrome': ProcessType.CHROME,
-  'miedziowanie': ProcessType.COPPER,
-  'miedź': ProcessType.COPPER,
-  'copper': ProcessType.COPPER,
-  'cynowanie': ProcessType.TIN,
-  'cyna': ProcessType.TIN,
-  'tin': ProcessType.TIN,
-  'złocenie': ProcessType.GOLD,
-  'złoto': ProcessType.GOLD,
-  'gold': ProcessType.GOLD,
-  'srebrzenie': ProcessType.SILVER,
-  'srebro': ProcessType.SILVER,
-  'silver': ProcessType.SILVER,
-  'anodowanie': ProcessType.ANODIZING,
-  'anodizing': ProcessType.ANODIZING,
-  'eloksalowanie': ProcessType.ANODIZING,
-  'pasywacja': ProcessType.PASSIVATION,
-  'passivation': ProcessType.PASSIVATION,
-  'inne': ProcessType.OTHER,
-  'other': ProcessType.OTHER,
+const PROCESS_TYPE_MAP: Record<string, ProcessTypeCode> = {
+  'cynkowanie': 'ZINC',
+  'cynk': 'ZINC',
+  'zinc': 'ZINC',
+  'niklowanie': 'NICKEL',
+  'nikiel': 'NICKEL',
+  'nickel': 'NICKEL',
+  'chromowanie': 'CHROME',
+  'chrom': 'CHROME',
+  'chrome': 'CHROME',
+  'miedziowanie': 'COPPER',
+  'miedz': 'COPPER',
+  'miedź': 'COPPER',
+  'copper': 'COPPER',
+  'cynowanie': 'TIN',
+  'cyna': 'TIN',
+  'tin': 'TIN',
+  'zlocenie': 'GOLD',
+  'złocenie': 'GOLD',
+  'zloto': 'GOLD',
+  'złoto': 'GOLD',
+  'gold': 'GOLD',
+  'srebrzenie': 'SILVER',
+  'srebro': 'SILVER',
+  'silver': 'SILVER',
+  'anodowanie': 'ANODIZING',
+  'anodizing': 'ANODIZING',
+  'eloksalowanie': 'ANODIZING',
+  'pasywacja': 'PASSIVATION',
+  'passivation': 'PASSIVATION',
+  'inne': 'OTHER',
+  'other': 'OTHER',
 };
 
 /** Mapowanie typów próbek */
@@ -579,21 +596,25 @@ function parseDecimalValue(value: string | number | null, decimalSeparator?: str
 /**
  * Mapuj wartość enum procesu.
  */
-function mapProcessType(value: string | null, customMapping?: Record<string, string>): ProcessType {
-  if (!value) return ProcessType.OTHER;
+function normalizeProcessTypeCode(value: string): string {
+  return value.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+}
+
+function mapProcessType(value: string | null, customMapping?: Record<string, string>): string {
+  if (!value) return 'OTHER';
 
   const lower = value.toLowerCase().trim();
 
   // Najpierw sprawdź mapowanie niestandardowe
   if (customMapping) {
     const mapped = customMapping[lower] || customMapping[value];
-    if (mapped && Object.values(ProcessType).includes(mapped as ProcessType)) {
-      return mapped as ProcessType;
+    if (mapped) {
+      return normalizeProcessTypeCode(mapped);
     }
   }
 
   // Wbudowane mapowanie
-  return PROCESS_TYPE_MAP[lower] || ProcessType.OTHER;
+  return PROCESS_TYPE_MAP[lower] || normalizeProcessTypeCode(value) || 'OTHER';
 }
 
 /**
@@ -1086,7 +1107,7 @@ async function findOrCreateClient(
 async function findOrCreateProcess(
   tx: Prisma.TransactionClient,
   processName: string,
-  processType: ProcessType,
+  processType: string,
   clientId: string | null,
   userId: string,
   importJobId: string

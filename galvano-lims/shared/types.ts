@@ -1,7 +1,7 @@
 // Shared types between frontend and backend
 
 export type UserRole = 'ADMIN' | 'LABORANT' | 'VIEWER';
-export type ProcessType = 'ZINC' | 'NICKEL' | 'CHROME' | 'COPPER' | 'TIN' | 'GOLD' | 'SILVER' | 'ANODIZING' | 'PASSIVATION' | 'OTHER';
+export type ProcessType = string;
 export type SampleType = 'BATH' | 'RINSE' | 'WASTEWATER' | 'RAW_MATERIAL' | 'OTHER';
 export type SampleStatus = 'REGISTERED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export type AnalysisStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'APPROVED' | 'REJECTED';

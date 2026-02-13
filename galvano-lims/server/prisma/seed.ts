@@ -1,7 +1,19 @@
-import { PrismaClient, UserRole, ProcessType } from '@prisma/client';
+import { PrismaClient, UserRole } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
+const DEFAULT_PROCESS_TYPES = [
+  { code: 'ZINC', name: 'Cynkowanie', sortOrder: 1 },
+  { code: 'NICKEL', name: 'Niklowanie', sortOrder: 2 },
+  { code: 'CHROME', name: 'Chromowanie', sortOrder: 3 },
+  { code: 'COPPER', name: 'Miedziowanie', sortOrder: 4 },
+  { code: 'TIN', name: 'Cynowanie', sortOrder: 5 },
+  { code: 'GOLD', name: 'Złocenie', sortOrder: 6 },
+  { code: 'SILVER', name: 'Srebrzenie', sortOrder: 7 },
+  { code: 'ANODIZING', name: 'Anodowanie', sortOrder: 8 },
+  { code: 'PASSIVATION', name: 'Pasywacja', sortOrder: 9 },
+  { code: 'OTHER', name: 'Inne', sortOrder: 10 },
+];
 
 async function main() {
   console.log('🌱 Rozpoczynanie seedowania bazy danych...\n');
@@ -17,6 +29,7 @@ async function main() {
   await prisma.sample.deleteMany();
   await prisma.processParameter.deleteMany();
   await prisma.process.deleteMany();
+  await prisma.processTypeDefinition.deleteMany();
   await prisma.client.deleteMany();
   await prisma.importJob.deleteMany();
   await prisma.importTemplate.deleteMany();
@@ -68,13 +81,28 @@ async function main() {
   console.log('🏢 Utworzono ustawienia firmy.\n');
 
   // ============================================================
-  // 3. PROCESSES WITH PARAMETERS
+  // 3. PROCESS TYPES
+  // ============================================================
+  await prisma.processTypeDefinition.createMany({
+    data: DEFAULT_PROCESS_TYPES.map((type) => ({
+      code: type.code,
+      name: type.name,
+      isActive: true,
+      sortOrder: type.sortOrder,
+    })),
+    skipDuplicates: true,
+  });
+
+  console.log(`🏷️  Utworzono ${DEFAULT_PROCESS_TYPES.length} typów procesów.\n`);
+
+  // ============================================================
+  // 4. PROCESSES WITH PARAMETERS
   // ============================================================
   const processesData = [
     {
       name: 'Cynkowanie kwaśne',
       description: 'Kąpiel cynkowa na bazie chlorku potasu. Stosowana do pokrywania detali stalowych warstwą cynku w środowisku kwaśnym.',
-      processType: ProcessType.ZINC,
+      processType: 'ZINC',
       parameters: [
         { parameterName: 'Cynk (Zn)', unit: 'g/l', minValue: 25, maxValue: 40, optimalValue: 32, sortOrder: 1 },
         { parameterName: 'Chlorek potasu (KCl)', unit: 'g/l', minValue: 180, maxValue: 240, optimalValue: 210, sortOrder: 2 },
@@ -88,7 +116,7 @@ async function main() {
     {
       name: 'Cynkowanie alkaliczne',
       description: 'Kąpiel cynkowa na bazie wodorotlenku sodu. Nie zawiera cyjanku. Dobra rozrzutność.',
-      processType: ProcessType.ZINC,
+      processType: 'ZINC',
       parameters: [
         { parameterName: 'Cynk (Zn)', unit: 'g/l', minValue: 8, maxValue: 14, optimalValue: 11, sortOrder: 1 },
         { parameterName: 'Wodorotlenek sodu (NaOH)', unit: 'g/l', minValue: 120, maxValue: 160, optimalValue: 140, sortOrder: 2 },
@@ -101,7 +129,7 @@ async function main() {
     {
       name: 'Niklowanie Wattsa',
       description: 'Klasyczna kąpiel niklowa Wattsa. Najczęściej stosowana do niklowania dekoracyjnego i technicznego.',
-      processType: ProcessType.NICKEL,
+      processType: 'NICKEL',
       parameters: [
         { parameterName: 'Siarczan niklu (NiSO₄·6H₂O)', unit: 'g/l', minValue: 240, maxValue: 300, optimalValue: 270, sortOrder: 1 },
         { parameterName: 'Chlorek niklu (NiCl₂·6H₂O)', unit: 'g/l', minValue: 40, maxValue: 60, optimalValue: 50, sortOrder: 2 },
@@ -115,7 +143,7 @@ async function main() {
     {
       name: 'Chromowanie dekoracyjne',
       description: 'Kąpiel do chromowania dekoracyjnego na bazie kwasu chromowego. Cienka warstwa chromu o charakterystycznym połysku.',
-      processType: ProcessType.CHROME,
+      processType: 'CHROME',
       parameters: [
         { parameterName: 'Kwas chromowy (CrO₃)', unit: 'g/l', minValue: 200, maxValue: 300, optimalValue: 250, sortOrder: 1 },
         { parameterName: 'Kwas siarkowy (H₂SO₄)', unit: 'g/l', minValue: 2.0, maxValue: 3.0, optimalValue: 2.5, sortOrder: 2 },
@@ -129,7 +157,7 @@ async function main() {
     {
       name: 'Miedziowanie kwaśne',
       description: 'Kąpiel miedziowa na bazie siarczanu miedzi. Stosowana do nakładania grubych warstw miedzi.',
-      processType: ProcessType.COPPER,
+      processType: 'COPPER',
       parameters: [
         { parameterName: 'Siarczan miedzi (CuSO₄·5H₂O)', unit: 'g/l', minValue: 180, maxValue: 240, optimalValue: 210, sortOrder: 1 },
         { parameterName: 'Miedź (Cu²⁺)', unit: 'g/l', minValue: 45, maxValue: 65, optimalValue: 55, sortOrder: 2 },
@@ -142,7 +170,7 @@ async function main() {
     {
       name: 'Cynowanie kwaśne',
       description: 'Kąpiel cynowa na bazie kwasu siarkowego. Stosowana w przemyśle elektronicznym.',
-      processType: ProcessType.TIN,
+      processType: 'TIN',
       parameters: [
         { parameterName: 'Cyna (Sn²⁺)', unit: 'g/l', minValue: 15, maxValue: 30, optimalValue: 22, sortOrder: 1 },
         { parameterName: 'Kwas siarkowy (H₂SO₄)', unit: 'g/l', minValue: 100, maxValue: 160, optimalValue: 130, sortOrder: 2 },
@@ -154,7 +182,7 @@ async function main() {
     {
       name: 'Pasywacja trójwartościowa',
       description: 'Pasywacja chromem trójwartościowym (Cr³⁺). Ekologiczna alternatywa dla pasywacji sześciowartościowej.',
-      processType: ProcessType.PASSIVATION,
+      processType: 'PASSIVATION',
       parameters: [
         { parameterName: 'Chrom trójwartościowy (Cr³⁺)', unit: 'g/l', minValue: 3, maxValue: 8, optimalValue: 5, sortOrder: 1 },
         { parameterName: 'pH', unit: 'pH', minValue: 1.8, maxValue: 2.5, optimalValue: 2.0, sortOrder: 2 },

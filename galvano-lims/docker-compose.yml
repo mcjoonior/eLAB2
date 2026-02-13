@@ -25,6 +25,8 @@ services:
       dockerfile: Dockerfile
     container_name: galvano-lims-server
     restart: unless-stopped
+    env_file:
+      - ./server/.env
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/galvano_lims?schema=public
       JWT_SECRET: galvano-lims-jwt-secret-change-in-production

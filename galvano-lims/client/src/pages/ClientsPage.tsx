@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Plus, Search, Download, Pencil, XCircle, X } from 'lucide-react';
@@ -57,6 +57,11 @@ export default function ClientsPage() {
   const [form, setForm] = useState<ClientForm>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof ClientForm, string>>>({});
+  const [gusLoading, setGusLoading] = useState(false);
+  const [gusError, setGusError] = useState('');
+  const [gusSuccess, setGusSuccess] = useState('');
+  const lastFetchedNipRef = useRef('');
 
   // Confirm deactivate
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -106,6 +111,10 @@ export default function ClientsPage() {
     setEditingClient(null);
     setForm(emptyForm);
     setFormError('');
+    setFieldErrors({});
+    setGusError('');
+    setGusSuccess('');
+    lastFetchedNipRef.current = '';
     setDialogOpen(true);
   }
 
@@ -124,27 +133,112 @@ export default function ClientsPage() {
       notes: client.notes || '',
     });
     setFormError('');
+    setFieldErrors({});
+    setGusError('');
+    setGusSuccess('');
+    lastFetchedNipRef.current = '';
     setDialogOpen(true);
+  }
+
+  function normalizeNip(nip: string): string {
+    return nip.replace(/\D/g, '');
+  }
+
+  async function fetchCompanyDataFromGus(trigger: 'manual' | 'blur') {
+    if (editingClient) return;
+    const nip = normalizeNip(form.nip);
+    if (nip.length !== 10) {
+      if (trigger === 'manual') setGusError('Wpisz poprawny 10-cyfrowy NIP.');
+      return;
+    }
+    if (trigger === 'blur' && lastFetchedNipRef.current === nip) return;
+
+    setGusLoading(true);
+    setGusError('');
+    setGusSuccess('');
+    try {
+      const response = await clientService.lookupByNipInGus(nip);
+      const data = response.data;
+
+      setForm((prev) => ({
+        ...prev,
+        nip,
+        companyName: prev.companyName.trim() ? prev.companyName : (data.companyName || prev.companyName),
+        address: prev.address.trim() ? prev.address : (data.address || prev.address),
+        city: prev.city.trim() ? prev.city : (data.city || prev.city),
+        postalCode: prev.postalCode.trim() ? prev.postalCode : (data.postalCode || prev.postalCode),
+        country: prev.country.trim() ? prev.country : (data.country || 'Polska'),
+      }));
+
+      lastFetchedNipRef.current = nip;
+      setGusSuccess('Pobrano i uzupełniono dane z GUS.');
+      setTimeout(() => setGusSuccess(''), 3000);
+    } catch (err: any) {
+      const message = err?.response?.data?.error || 'Nie udało się pobrać danych z GUS.';
+      setGusError(message);
+    } finally {
+      setGusLoading(false);
+    }
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!form.companyName.trim()) {
-      setFormError(t('common.required'));
+    setFormError('');
+    setFieldErrors({});
+
+    const trimmedCompanyName = form.companyName.trim();
+    if (!trimmedCompanyName) {
+      setFieldErrors({ companyName: 'Nazwa firmy jest wymagana.' });
+      setFormError('Uzupełnij wymagane pola.');
       return;
     }
+    if (trimmedCompanyName.length < 2) {
+      setFieldErrors({ companyName: 'Nazwa firmy musi mieć co najmniej 2 znaki.' });
+      setFormError('Uzupełnij wymagane pola.');
+      return;
+    }
+    if (!editingClient) {
+      const trimmedEmail = form.email.trim();
+      if (!trimmedEmail) {
+        setFieldErrors({ email: 'Adres e-mail jest wymagany.' });
+        setFormError('Uzupełnij wymagane pola.');
+        return;
+      }
+    }
+
+    const payload = buildClientPayload(form);
+
     setSaving(true);
-    setFormError('');
     try {
       if (editingClient) {
-        await clientService.update(editingClient.id, form);
+        await clientService.update(editingClient.id, payload);
       } else {
-        await clientService.create(form);
+        await clientService.create(payload);
       }
       setDialogOpen(false);
       fetchClients();
-    } catch {
-      setFormError(t('common.errorOccurred'));
+    } catch (err: any) {
+      const responseData = err?.response?.data;
+      const backendError = responseData?.error || responseData?.message;
+      const backendDetails = responseData?.details;
+
+      const mappedFieldErrors: Partial<Record<keyof ClientForm, string>> = {};
+      if (backendDetails && typeof backendDetails === 'object') {
+        for (const [key, value] of Object.entries(backendDetails)) {
+          if (!(key in form)) continue;
+          if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'string') {
+            mappedFieldErrors[key as keyof ClientForm] = value[0];
+          } else if (typeof value === 'string') {
+            mappedFieldErrors[key as keyof ClientForm] = value;
+          }
+        }
+      }
+
+      if (Object.keys(mappedFieldErrors).length > 0) {
+        setFieldErrors(mappedFieldErrors);
+      }
+
+      setFormError(backendError || t('common.errorOccurred'));
     } finally {
       setSaving(false);
     }
@@ -185,6 +279,36 @@ export default function ClientsPage() {
 
   function updateField(field: keyof ClientForm, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+    if (field === 'nip') {
+      setGusError('');
+      setGusSuccess('');
+    }
+  }
+
+  function toOptional(value: string): string | undefined {
+    const trimmed = value.trim();
+    return trimmed ? trimmed : undefined;
+  }
+
+  function buildClientPayload(source: ClientForm): Partial<Client> {
+    return {
+      companyName: source.companyName.trim(),
+      nip: toOptional(source.nip),
+      address: toOptional(source.address),
+      city: toOptional(source.city),
+      postalCode: toOptional(source.postalCode),
+      country: toOptional(source.country) || 'Polska',
+      contactPerson: toOptional(source.contactPerson),
+      email: toOptional(source.email),
+      phone: toOptional(source.phone),
+      notes: toOptional(source.notes),
+    };
   }
 
   return (
@@ -423,9 +547,22 @@ export default function ClientsPage() {
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Pola oznaczone <span className="font-semibold">*</span> są wymagane.
+              </p>
               {formError && (
                 <div className="rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 p-3 text-sm text-red-700 dark:text-red-400">
                   {formError}
+                </div>
+              )}
+              {gusError && (
+                <div className="rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 p-3 text-sm text-red-700 dark:text-red-400">
+                  {gusError}
+                </div>
+              )}
+              {gusSuccess && (
+                <div className="rounded-lg bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 p-3 text-sm text-green-700 dark:text-green-400">
+                  {gusSuccess}
                 </div>
               )}
 
@@ -442,6 +579,9 @@ export default function ClientsPage() {
                     onChange={(e) => updateField('companyName', e.target.value)}
                     className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-colors"
                   />
+                  {fieldErrors.companyName && (
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.companyName}</p>
+                  )}
                 </div>
 
                 {/* NIP */}
@@ -449,12 +589,29 @@ export default function ClientsPage() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     {t('clients.nip')}
                   </label>
-                  <input
-                    type="text"
-                    value={form.nip}
-                    onChange={(e) => updateField('nip', e.target.value)}
-                    className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-colors"
-                  />
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={form.nip}
+                      onChange={(e) => updateField('nip', e.target.value)}
+                      onBlur={() => { void fetchCompanyDataFromGus('blur'); }}
+                      className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-colors"
+                    />
+                    {fieldErrors.nip && (
+                      <p className="text-xs text-red-600 dark:text-red-400">{fieldErrors.nip}</p>
+                    )}
+                    {!editingClient && (
+                      <button
+                        type="button"
+                        onClick={() => { void fetchCompanyDataFromGus('manual'); }}
+                        disabled={gusLoading}
+                        className="inline-flex items-center gap-2 rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {gusLoading && <div className="h-3 w-3 border-2 border-gray-400 border-t-gray-700 rounded-full animate-spin" />}
+                        Pobierz dane z GUS
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Address */}
@@ -468,6 +625,9 @@ export default function ClientsPage() {
                     onChange={(e) => updateField('address', e.target.value)}
                     className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-colors"
                   />
+                  {fieldErrors.address && (
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.address}</p>
+                  )}
                 </div>
 
                 {/* City */}
@@ -481,6 +641,9 @@ export default function ClientsPage() {
                     onChange={(e) => updateField('city', e.target.value)}
                     className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-colors"
                   />
+                  {fieldErrors.city && (
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.city}</p>
+                  )}
                 </div>
 
                 {/* Postal code */}
@@ -494,6 +657,9 @@ export default function ClientsPage() {
                     onChange={(e) => updateField('postalCode', e.target.value)}
                     className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-colors"
                   />
+                  {fieldErrors.postalCode && (
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.postalCode}</p>
+                  )}
                 </div>
 
                 {/* Country */}
@@ -507,6 +673,9 @@ export default function ClientsPage() {
                     onChange={(e) => updateField('country', e.target.value)}
                     className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-colors"
                   />
+                  {fieldErrors.country && (
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.country}</p>
+                  )}
                 </div>
 
                 {/* Contact person */}
@@ -520,19 +689,26 @@ export default function ClientsPage() {
                     onChange={(e) => updateField('contactPerson', e.target.value)}
                     className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-colors"
                   />
+                  {fieldErrors.contactPerson && (
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.contactPerson}</p>
+                  )}
                 </div>
 
                 {/* Email */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    {t('clients.email')}
+                    {t('clients.email')} {!editingClient && <span className="font-semibold">*</span>}
                   </label>
                   <input
                     type="email"
+                    required={!editingClient}
                     value={form.email}
                     onChange={(e) => updateField('email', e.target.value)}
                     className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-colors"
                   />
+                  {fieldErrors.email && (
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.email}</p>
+                  )}
                 </div>
 
                 {/* Phone */}
@@ -546,6 +722,9 @@ export default function ClientsPage() {
                     onChange={(e) => updateField('phone', e.target.value)}
                     className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-colors"
                   />
+                  {fieldErrors.phone && (
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.phone}</p>
+                  )}
                 </div>
 
                 {/* Notes */}
@@ -559,6 +738,9 @@ export default function ClientsPage() {
                     rows={3}
                     className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-colors resize-none"
                   />
+                  {fieldErrors.notes && (
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.notes}</p>
+                  )}
                 </div>
               </div>
 

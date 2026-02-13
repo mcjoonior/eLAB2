@@ -64,6 +64,10 @@ function emptyRow(): NewResultRow {
   return { parameterName: '', unit: '', value: '', minReference: '', maxReference: '', optimalReference: '' };
 }
 
+function makeResultKey(parameterName: string, unit: string): string {
+  return `${parameterName.trim().toLowerCase()}__${unit.trim().toLowerCase()}`;
+}
+
 function getRowBgColor(deviation: Deviation): string {
   switch (deviation) {
     case 'WITHIN_RANGE':
@@ -155,22 +159,71 @@ export default function AnalysisDetailPage() {
           values[r.id] = r.value != null ? String(r.value) : '';
         });
         setResultValues(values);
-        setNewResults([]);
       } else {
-        // Pre-populate new results from process parameters
+        setResultValues({});
+      }
+
+      // During active analysis always keep draft editor based on full
+      // process parameters, enriched with already saved values.
+      if (data.status === 'PENDING' || data.status === 'IN_PROGRESS') {
         const params = (data.sample?.process as any)?.parameters as ProcessParameter[] | undefined;
-        if (params && params.length > 0) {
-          setNewResults(params.map((p) => ({
+        const resultsByKey = new Map(
+          (data.results || []).map((r) => [makeResultKey(r.parameterName, r.unit), r] as const)
+        );
+
+        const baseRows = (params || []).map((p) => {
+          const saved = resultsByKey.get(makeResultKey(p.parameterName, p.unit));
+          return {
             parameterName: p.parameterName,
             unit: p.unit,
-            value: '',
-            minReference: p.minValue != null ? String(p.minValue) : '',
-            maxReference: p.maxValue != null ? String(p.maxValue) : '',
-            optimalReference: p.optimalValue != null ? String(p.optimalValue) : '',
-          })));
-        } else {
-          setNewResults([]);
-        }
+            value: saved?.value != null ? String(saved.value) : '',
+            minReference: saved?.minReference != null
+              ? String(saved.minReference)
+              : (p.minValue != null ? String(p.minValue) : ''),
+            maxReference: saved?.maxReference != null
+              ? String(saved.maxReference)
+              : (p.maxValue != null ? String(p.maxValue) : ''),
+            optimalReference: saved?.optimalReference != null
+              ? String(saved.optimalReference)
+              : (p.optimalValue != null ? String(p.optimalValue) : ''),
+          };
+        });
+
+        setNewResults((prev) => {
+          const merged = new Map<string, NewResultRow>();
+
+          // 1) Start from process definition (canonical order)
+          baseRows.forEach((row) => {
+            merged.set(makeResultKey(row.parameterName, row.unit), row);
+          });
+
+          // 2) Keep rows already visible in UI so list does not shrink after save
+          prev.forEach((row) => {
+            const key = makeResultKey(row.parameterName, row.unit);
+            if (!merged.has(key)) {
+              merged.set(key, row);
+            }
+          });
+
+          // 3) Ensure any persisted results absent in process are visible too
+          (data.results || []).forEach((r) => {
+            const key = makeResultKey(r.parameterName, r.unit);
+            if (!merged.has(key)) {
+              merged.set(key, {
+                parameterName: r.parameterName,
+                unit: r.unit,
+                value: r.value != null ? String(r.value) : '',
+                minReference: r.minReference != null ? String(r.minReference) : '',
+                maxReference: r.maxReference != null ? String(r.maxReference) : '',
+                optimalReference: r.optimalReference != null ? String(r.optimalReference) : '',
+              });
+            }
+          });
+
+          return Array.from(merged.values());
+        });
+      } else {
+        setNewResults([]);
       }
     } catch {
       setError('Nie udało się pobrać szczegółów analizy.');
@@ -192,6 +245,7 @@ export default function AnalysisDetailPage() {
   const isAdmin = user?.role === 'ADMIN';
   const canApprove = isAdmin && analysis?.status === 'COMPLETED';
   const hasExistingResults = analysis?.results && analysis.results.length > 0;
+  const showDraftResultsEditor = Boolean(isEditable);
 
   // ---- Status change ----
   async function handleChangeStatus(newStatus: AnalysisStatus) {
@@ -611,101 +665,8 @@ export default function AnalysisDetailPage() {
           </div>
         )}
 
-        {hasExistingResults ? (
-          /* Existing results table with inline editing */
-          <form onSubmit={handleSaveResults}>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
-                    <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Parametr</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Jednostka</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Wartość</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Min</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Max</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Optimum</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Odchylenie</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-700 dark:text-gray-300">%</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {analysis.results!.map((result) => (
-                    <tr
-                      key={result.id}
-                      className={`transition-colors ${getRowBgColor(result.deviation)}`}
-                    >
-                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
-                        {result.parameterName}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                        {result.unit}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {isEditable ? (
-                          <input
-                            type="number"
-                            step="any"
-                            value={resultValues[result.id] ?? ''}
-                            onChange={(e) =>
-                              setResultValues((prev) => ({
-                                ...prev,
-                                [result.id]: e.target.value,
-                              }))
-                            }
-                            className="w-24 text-right rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none"
-                          />
-                        ) : (
-                          <span className="font-medium text-gray-900 dark:text-white">
-                            {formatNumber(result.value)}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
-                        {result.minReference != null ? formatNumber(result.minReference) : '-'}
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
-                        {result.maxReference != null ? formatNumber(result.maxReference) : '-'}
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
-                        {result.optimalReference != null ? formatNumber(result.optimalReference) : '-'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getDeviationBadgeColor(result.deviation)}`}>
-                          {getDeviationLabel(result.deviation)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className={getDeviationColor(result.deviation)}>
-                          {result.deviationPercent != null
-                            ? `${formatNumber(result.deviationPercent)}%`
-                            : '-'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {isEditable && (
-              <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
-                <button
-                  type="submit"
-                  disabled={savingResults}
-                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-                >
-                  {savingResults ? (
-                    <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  Zapisz wyniki
-                </button>
-              </div>
-            )}
-          </form>
-        ) : isEditable ? (
-          /* New results entry form */
+        {showDraftResultsEditor ? (
+          /* New/draft results entry form */
           <form onSubmit={handleSaveNewResults}>
             <div className="px-6 py-4">
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
@@ -828,6 +789,99 @@ export default function AnalysisDetailPage() {
                 )}
               </div>
             </div>
+          </form>
+        ) : hasExistingResults ? (
+          /* Existing results table with inline editing */
+          <form onSubmit={handleSaveResults}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                    <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Parametr</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Jednostka</th>
+                    <th className="text-right px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Wartość</th>
+                    <th className="text-right px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Min</th>
+                    <th className="text-right px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Max</th>
+                    <th className="text-right px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Optimum</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Odchylenie</th>
+                    <th className="text-right px-4 py-3 font-medium text-gray-700 dark:text-gray-300">%</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {analysis.results!.map((result) => (
+                    <tr
+                      key={result.id}
+                      className={`transition-colors ${getRowBgColor(result.deviation)}`}
+                    >
+                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
+                        {result.parameterName}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                        {result.unit}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {isEditable ? (
+                          <input
+                            type="number"
+                            step="any"
+                            value={resultValues[result.id] ?? ''}
+                            onChange={(e) =>
+                              setResultValues((prev) => ({
+                                ...prev,
+                                [result.id]: e.target.value,
+                              }))
+                            }
+                            className="w-24 text-right rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none"
+                          />
+                        ) : (
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {formatNumber(result.value)}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
+                        {result.minReference != null ? formatNumber(result.minReference) : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
+                        {result.maxReference != null ? formatNumber(result.maxReference) : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
+                        {result.optimalReference != null ? formatNumber(result.optimalReference) : '-'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getDeviationBadgeColor(result.deviation)}`}>
+                          {getDeviationLabel(result.deviation)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className={getDeviationColor(result.deviation)}>
+                          {result.deviationPercent != null
+                            ? `${formatNumber(result.deviationPercent)}%`
+                            : '-'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {isEditable && (
+              <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={savingResults}
+                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                >
+                  {savingResults ? (
+                    <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  Zapisz wyniki
+                </button>
+              </div>
+            )}
           </form>
         ) : (
           <div className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">

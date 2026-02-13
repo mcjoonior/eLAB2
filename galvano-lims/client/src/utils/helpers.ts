@@ -146,7 +146,7 @@ export function getAnalysisTypeColor(type: AnalysisType): string {
 }
 
 export function getProcessTypeLabel(type: ProcessType): string {
-  const labels: Record<ProcessType, string> = {
+  const labels: Record<string, string> = {
     ZINC: 'Cynkowanie',
     NICKEL: 'Niklowanie',
     CHROME: 'Chromowanie',
@@ -158,13 +158,14 @@ export function getProcessTypeLabel(type: ProcessType): string {
     PASSIVATION: 'Pasywacja',
     OTHER: 'Inne',
   };
-  return labels[type] || type;
+  if (labels[type]) return labels[type];
+  return type.replace(/_/g, ' ');
 }
 
 export function getSampleTypeLabel(type: SampleType): string {
   const labels: Record<SampleType, string> = {
     BATH: 'Kąpiel',
-    RINSE: 'Płukanka',
+    RINSE: 'Płuczka',
     WASTEWATER: 'Ściek',
     RAW_MATERIAL: 'Surowiec',
     OTHER: 'Inne',

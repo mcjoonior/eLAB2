@@ -154,7 +154,7 @@ model Process {
   id          String      @id @default(uuid())
   name        String
   description String?
-  processType ProcessType
+  processType String
   clientId    String?
   isActive    Boolean     @default(true)
   legacyCode  String?
@@ -167,6 +167,18 @@ model Process {
   samples    Sample[]
 
   @@map("processes")
+}
+
+model ProcessTypeDefinition {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("process_type_definitions")
 }
 
 model ProcessParameter {

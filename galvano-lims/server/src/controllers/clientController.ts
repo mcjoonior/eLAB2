@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../index';
 import { AuthenticatedRequest } from '../middleware/auth';
+import { lookupCompanyByNipInGus } from '../services/gusService';
 
 // ============================================================
 // Walidacja Zod
@@ -16,12 +17,23 @@ const createClientSchema = z.object({
   postalCode: z.string().optional().nullable(),
   country: z.string().optional().default('Polska'),
   contactPerson: z.string().optional().nullable(),
-  email: z.string().email('Nieprawidłowy adres e-mail').optional().nullable(),
+  email: z.string().min(1, 'Adres e-mail jest wymagany').email('Nieprawidłowy adres e-mail'),
   phone: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
 });
 
 const updateClientSchema = createClientSchema.partial();
+const lookupGusSchema = z.object({
+  nip: z.string().length(10, 'NIP musi mieć dokładnie 10 cyfr').regex(/^\d+$/, 'NIP może zawierać wyłącznie cyfry'),
+});
+
+function isValidNipChecksum(nip: string): boolean {
+  if (!/^\d{10}$/.test(nip)) return false;
+  const weights = [6, 5, 7, 2, 3, 4, 5, 6, 7];
+  const sum = weights.reduce((acc, w, i) => acc + w * Number(nip[i]), 0);
+  const checksum = sum % 11;
+  return checksum !== 10 && checksum === Number(nip[9]);
+}
 
 // ============================================================
 // GET / - Lista klientów z wyszukiwaniem, paginacją, sortowaniem
@@ -209,6 +221,55 @@ export const createClient = async (req: AuthenticatedRequest, res: Response, nex
     });
 
     res.status(201).json(client);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================
+// POST /lookup-gus - Pobranie danych firmy z GUS po NIP
+// ============================================================
+
+export const lookupClientInGus = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const validation = lookupGusSchema.safeParse(req.body);
+    if (!validation.success) {
+      res.status(400).json({
+        error: 'Błąd walidacji danych',
+        details: validation.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    const nip = validation.data.nip;
+    if (!isValidNipChecksum(nip)) {
+      res.status(400).json({ error: 'Nieprawidłowy numer NIP (błędna suma kontrolna).' });
+      return;
+    }
+
+    const found = await lookupCompanyByNipInGus(nip);
+    if (!found) {
+      res.status(404).json({ error: 'Nie znaleziono podmiotu w bazie GUS dla podanego NIP.' });
+      return;
+    }
+
+    res.json({
+      source: 'GUS',
+      data: {
+        companyName: found.data.companyName,
+        nip: found.data.nip,
+        address: found.data.address || '',
+        city: found.data.city || '',
+        postalCode: found.data.postalCode || '',
+        country: found.data.country || 'Polska',
+      },
+      meta: {
+        regon: found.data.regon,
+        krs: found.data.krs,
+        type: found.data.type,
+        silosId: found.data.silosId,
+      },
+    });
   } catch (error) {
     next(error);
   }
