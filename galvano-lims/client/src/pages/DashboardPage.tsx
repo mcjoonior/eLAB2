@@ -212,9 +212,9 @@ export default function DashboardPage() {
 
   const wrapperClassByVariant: Record<DashboardVariant, string> = {
     CLEAN: 'space-y-6',
-    MODERN: 'space-y-6 rounded-3xl bg-gradient-to-br from-slate-50 via-blue-50/70 to-cyan-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 p-4 sm:p-6',
-    OCEAN: 'space-y-6 rounded-3xl bg-gradient-to-br from-teal-50 via-cyan-50/70 to-sky-50 dark:from-slate-900 dark:via-cyan-950/60 dark:to-blue-950/60 p-4 sm:p-6',
-    GRAPHITE: 'space-y-6 rounded-3xl bg-gradient-to-br from-zinc-100 via-slate-100/70 to-gray-100 dark:from-zinc-900 dark:via-gray-900 dark:to-slate-900 p-4 sm:p-6',
+    MODERN: 'space-y-6 bg-gradient-to-br from-slate-50 via-blue-50/70 to-cyan-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 -m-4 md:-m-6 p-4 md:p-6 min-h-full',
+    OCEAN: 'space-y-6 bg-gradient-to-br from-teal-50 via-cyan-50/70 to-sky-50 dark:from-slate-900 dark:via-cyan-950/60 dark:to-blue-950/60 -m-4 md:-m-6 p-4 md:p-6 min-h-full',
+    GRAPHITE: 'space-y-6 bg-gradient-to-br from-zinc-100 via-slate-100/70 to-gray-100 dark:from-zinc-900 dark:via-gray-900 dark:to-slate-900 -m-4 md:-m-6 p-4 md:p-6 min-h-full',
     LIGHT_CONCEPT: 'space-y-6 bg-[#F6F4F0] -m-4 md:-m-6 p-4 md:p-6 min-h-full',
   };
 

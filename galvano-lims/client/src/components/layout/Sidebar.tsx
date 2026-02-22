@@ -89,7 +89,7 @@ const sidebarThemes: Record<DashboardVariant, SidebarTheme> = {
     userRole: 'text-zinc-200/80',
   },
   LIGHT_CONCEPT: {
-    aside: 'bg-[#1B1D24] text-[#B0B3BC] border-r-0 shadow-xl lg:rounded-r-xl',
+    aside: 'bg-[#1B1D24] text-[#B0B3BC] border-r-0 shadow-xl',
     headerBorder: 'border-b border-white/10',
     closeHover: 'hover:bg-white/10',
     navActive: 'bg-gradient-to-r from-indigo-500/35 to-sky-500/25 text-white',
@@ -147,7 +147,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       )}
 
       <aside
-        className={`fixed left-0 top-16 z-50 h-[calc(100vh-4rem)] w-64 transform transition-transform duration-200 ease-in-out lg:relative lg:top-0 lg:h-full lg:translate-x-0 lg:static lg:z-auto ${theme.aside} ${
+        className={`fixed left-0 top-16 z-50 h-[calc(100vh-4rem)] w-64 transform transition-transform duration-200 ease-in-out lg:relative lg:top-0 lg:h-full lg:translate-x-0 lg:static lg:z-auto lg:rounded-r-xl ${theme.aside} ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
