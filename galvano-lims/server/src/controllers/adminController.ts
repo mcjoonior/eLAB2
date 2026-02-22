@@ -93,6 +93,7 @@ const updateSettingsSchema = z.object({
   appSubtitle: z.string().optional().nullable(),
   dashboardVariant: z.enum(['CLEAN', 'MODERN', 'OCEAN', 'GRAPHITE', 'LIGHT_CONCEPT']).optional(),
   themeMode: z.enum(['LIGHT', 'DARK']).optional(),
+  appLanguage: z.enum(['PL', 'EN']).optional(),
   address: z.string().optional().nullable(),
   city: z.string().optional().nullable(),
   postalCode: z.string().optional().nullable(),

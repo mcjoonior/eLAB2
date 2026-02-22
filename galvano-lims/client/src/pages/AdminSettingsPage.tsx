@@ -262,6 +262,18 @@ export default function AdminSettingsPage() {
                 </select>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Ustawienie globalne dla całej aplikacji.</p>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Język aplikacji</label>
+                <select
+                  value={settings.appLanguage || 'PL'}
+                  onChange={(e) => updateField('appLanguage', e.target.value)}
+                  className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                >
+                  <option value="PL">Polski</option>
+                  <option value="EN">English</option>
+                </select>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Wartość globalna dla wszystkich użytkowników.</p>
+              </div>
             </div>
           )}
 

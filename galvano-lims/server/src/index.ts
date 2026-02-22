@@ -87,13 +87,21 @@ app.get('/api/branding', async (_req, res) => {
     const settings = await prisma.companySettings.findFirst();
     res.json({
       companyName: settings?.companyName ?? 'eLAB LIMS',
-      appSubtitle: (settings as any)?.appSubtitle ?? 'LIMS',
+      appSubtitle: settings?.appSubtitle ?? 'LIMS',
       logoUrl: settings?.logoUrl ?? null,
-      dashboardVariant: (settings as any)?.dashboardVariant ?? 'CLEAN',
-      themeMode: (settings as any)?.themeMode ?? 'LIGHT',
+      dashboardVariant: settings?.dashboardVariant ?? 'CLEAN',
+      themeMode: settings?.themeMode ?? 'LIGHT',
+      appLanguage: settings?.appLanguage ?? 'PL',
     });
   } catch {
-    res.json({ companyName: 'eLAB LIMS', appSubtitle: 'LIMS', logoUrl: null, dashboardVariant: 'CLEAN', themeMode: 'LIGHT' });
+    res.json({
+      companyName: 'eLAB LIMS',
+      appSubtitle: 'LIMS',
+      logoUrl: null,
+      dashboardVariant: 'CLEAN',
+      themeMode: 'LIGHT',
+      appLanguage: 'PL',
+    });
   }
 });
 

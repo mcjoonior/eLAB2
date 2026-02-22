@@ -139,6 +139,11 @@ enum ThemeMode {
   DARK
 }
 
+enum AppLanguage {
+  PL
+  EN
+}
+
 // ============================================================
 // MODELS
 // ============================================================
@@ -378,6 +383,7 @@ model CompanySettings {
   appSubtitle      String? @default("LIMS")
   dashboardVariant DashboardVariant @default(CLEAN)
   themeMode        ThemeMode @default(LIGHT)
+  appLanguage      AppLanguage @default(PL)
   logoUrl          String?
   address          String?
   city             String?

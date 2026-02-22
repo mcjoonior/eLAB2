@@ -1,5 +1,5 @@
 import api from './api';
-import type { User, CompanySettings, AuditLog, PaginatedResponse, Notification, DashboardVariant, ThemeMode } from '@/types';
+import type { User, CompanySettings, AuditLog, PaginatedResponse, Notification, DashboardVariant, ThemeMode, AppLanguage } from '@/types';
 
 export interface Branding {
   companyName: string;
@@ -7,6 +7,7 @@ export interface Branding {
   logoUrl: string | null;
   dashboardVariant: DashboardVariant;
   themeMode: ThemeMode;
+  appLanguage: AppLanguage;
 }
 
 export async function getBranding(): Promise<Branding> {

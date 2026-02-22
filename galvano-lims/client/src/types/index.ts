@@ -19,6 +19,7 @@ export type MaintenanceResult = 'PASSED' | 'FAILED' | 'CONDITIONAL';
 export type OrderStatus = 'NEW' | 'IN_PROGRESS' | 'COMPLETED' | 'INVOICED' | 'CANCELLED';
 export type DashboardVariant = 'CLEAN' | 'MODERN' | 'OCEAN' | 'GRAPHITE' | 'LIGHT_CONCEPT';
 export type ThemeMode = 'LIGHT' | 'DARK';
+export type AppLanguage = 'PL' | 'EN';
 
 // ============================================================
 // Models
@@ -197,6 +198,7 @@ export interface CompanySettings {
   appSubtitle?: string;
   dashboardVariant?: DashboardVariant;
   themeMode?: ThemeMode;
+  appLanguage?: AppLanguage;
   logoUrl?: string;
   address?: string;
   city?: string;

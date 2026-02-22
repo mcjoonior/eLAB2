@@ -10,7 +10,6 @@ import type { Notification, DashboardVariant } from '@/types';
 import {
   Menu,
   Bell,
-  Globe,
   LogOut,
   Plus,
   TestTube2,
@@ -30,7 +29,7 @@ const brandTextColors: Record<DashboardVariant, string> = {
 };
 
 export function Topbar({ onMenuClick }: TopbarProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -82,10 +81,6 @@ export function Topbar({ onMenuClick }: TopbarProps) {
     } catch { /* ignore */ }
     logout();
     navigate('/login');
-  };
-
-  const toggleLanguage = () => {
-    i18n.changeLanguage(i18n.language === 'pl' ? 'en' : 'pl');
   };
 
   const variant: DashboardVariant = branding?.dashboardVariant || 'CLEAN';
@@ -202,16 +197,6 @@ export function Topbar({ onMenuClick }: TopbarProps) {
               </div>
             )}
           </div>
-
-          {/* Language toggle */}
-          <button
-            onClick={toggleLanguage}
-            className="p-2 rounded-md hover:bg-accent text-muted-foreground"
-            title={t('common.language')}
-          >
-            <Globe className="h-4 w-4" />
-            <span className="ml-1 text-xs font-medium">{i18n.language.toUpperCase()}</span>
-          </button>
 
           {/* Notifications */}
           <div className="relative">
