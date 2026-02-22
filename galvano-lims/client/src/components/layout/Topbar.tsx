@@ -92,6 +92,12 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   const logoUrl = branding?.logoUrl || null;
   const companyName = branding?.companyName || 'eLAB LIMS';
   const isLightConcept = variant === 'LIGHT_CONCEPT';
+  const todayLabel = new Intl.DateTimeFormat('pl-PL', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    weekday: 'short',
+  }).format(new Date());
 
   async function handleMarkAsRead(id: string, link?: string) {
     try {
@@ -148,6 +154,12 @@ export function Topbar({ onMenuClick }: TopbarProps) {
               {companyName}
             </span>
           </button>
+
+          {isLightConcept && (
+            <span className="hidden lg:inline-flex rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-medium text-gray-500">
+              {todayLabel}
+            </span>
+          )}
 
           {/* Global Search */}
           <div className="hidden md:block w-full max-w-md">

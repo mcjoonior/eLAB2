@@ -272,26 +272,12 @@ export default function DashboardPage() {
     ? 'rounded-xl border border-slate-200/70 dark:border-gray-700/80 bg-white/85 dark:bg-gray-800/85 backdrop-blur-sm'
     : 'rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800';
 
-  const todayLabel = new Intl.DateTimeFormat('pl-PL', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    weekday: 'short',
-  }).format(new Date());
-
   return (
     <div className={wrapperClassByVariant[dashboardVariant]}>
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className={isColorVariant ? 'text-3xl font-bold tracking-tight text-slate-900 dark:text-white' : 'text-2xl font-bold text-gray-900 dark:text-white'}>
-            {t('dashboard.title')}
-          </h1>
-          {isLightConcept && (
-            <span className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-medium text-gray-500">
-              {todayLabel}
-            </span>
-          )}
-        </div>
+        <h1 className={isColorVariant ? 'text-3xl font-bold tracking-tight text-slate-900 dark:text-white' : 'text-2xl font-bold text-gray-900 dark:text-white'}>
+          {t('dashboard.title')}
+        </h1>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
