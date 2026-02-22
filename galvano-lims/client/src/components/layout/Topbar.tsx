@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
-import { notificationService } from '@/services/adminService';
+import { notificationService, getBranding, type Branding } from '@/services/adminService';
 import { authService } from '@/services/authService';
 import { GlobalSearchDropdown } from '@/components/common/GlobalSearchDropdown';
 import { formatDateTime } from '@/utils/helpers';
-import type { Notification } from '@/types';
+import type { Notification, DashboardVariant } from '@/types';
 import {
   Menu,
   Bell,
@@ -24,6 +24,13 @@ interface TopbarProps {
   onMenuClick: () => void;
 }
 
+const brandTextColors: Record<DashboardVariant, string> = {
+  CLEAN: 'text-foreground',
+  MODERN: 'text-foreground',
+  OCEAN: 'text-teal-700 dark:text-teal-300',
+  GRAPHITE: 'text-slate-700 dark:text-slate-200',
+};
+
 export function Topbar({ onMenuClick }: TopbarProps) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -33,6 +40,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
+  const [branding, setBranding] = useState<Branding | null>(null);
   const quickActionsRef = useRef<HTMLDivElement>(null);
 
   async function refreshNotifications() {
@@ -52,6 +60,12 @@ export function Topbar({ onMenuClick }: TopbarProps) {
     refreshNotifications();
     const interval = setInterval(refreshNotifications, 30000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    getBranding()
+      .then(setBranding)
+      .catch(() => {});
   }, []);
 
   // Click outside to close quick actions
@@ -80,6 +94,10 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   const toggleLanguage = () => {
     i18n.changeLanguage(i18n.language === 'pl' ? 'en' : 'pl');
   };
+
+  const variant: DashboardVariant = branding?.dashboardVariant || 'CLEAN';
+  const logoUrl = branding?.logoUrl || null;
+  const companyName = branding?.companyName || 'eLAB LIMS';
 
   async function handleMarkAsRead(id: string, link?: string) {
     try {
@@ -111,6 +129,24 @@ export function Topbar({ onMenuClick }: TopbarProps) {
             className="lg:hidden p-2 rounded-md hover:bg-accent flex-shrink-0"
           >
             <Menu className="h-5 w-5" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="hidden lg:flex items-center gap-3 rounded-lg px-2 py-1 hover:bg-accent transition-colors flex-shrink-0"
+          >
+            <div className="h-10 w-[130px] flex items-center justify-center overflow-hidden">
+              {logoUrl ? (
+                <img src={logoUrl} alt="Logo" className="max-h-10 max-w-[125px] object-contain" />
+              ) : (
+                <span className="text-xs text-muted-foreground">LOGO</span>
+              )}
+            </div>
+            <div className="h-7 w-px bg-border" />
+            <span className={`text-2xl font-semibold whitespace-nowrap ${brandTextColors[variant]}`}>
+              {companyName}
+            </span>
           </button>
 
           {/* Global Search */}

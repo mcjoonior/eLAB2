@@ -89,9 +89,10 @@ app.get('/api/branding', async (_req, res) => {
       companyName: settings?.companyName ?? 'eLAB LIMS',
       appSubtitle: (settings as any)?.appSubtitle ?? 'LIMS',
       logoUrl: settings?.logoUrl ?? null,
+      dashboardVariant: (settings as any)?.dashboardVariant ?? 'CLEAN',
     });
   } catch {
-    res.json({ companyName: 'eLAB LIMS', appSubtitle: 'LIMS', logoUrl: null });
+    res.json({ companyName: 'eLAB LIMS', appSubtitle: 'LIMS', logoUrl: null, dashboardVariant: 'CLEAN' });
   }
 });
 

@@ -126,6 +126,13 @@ enum OrderStatus {
   CANCELLED
 }
 
+enum DashboardVariant {
+  CLEAN
+  MODERN
+  OCEAN
+  GRAPHITE
+}
+
 // ============================================================
 // MODELS
 // ============================================================
@@ -363,6 +370,7 @@ model CompanySettings {
   id               String  @id @default(uuid())
   companyName      String  @default("Laboratorium Galwaniczne")
   appSubtitle      String? @default("LIMS")
+  dashboardVariant DashboardVariant @default(CLEAN)
   logoUrl          String?
   address          String?
   city             String?

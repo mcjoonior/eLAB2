@@ -1,10 +1,11 @@
 import api from './api';
-import type { User, CompanySettings, AuditLog, PaginatedResponse, Notification } from '@/types';
+import type { User, CompanySettings, AuditLog, PaginatedResponse, Notification, DashboardVariant } from '@/types';
 
 export interface Branding {
   companyName: string;
   appSubtitle: string;
   logoUrl: string | null;
+  dashboardVariant: DashboardVariant;
 }
 
 export async function getBranding(): Promise<Branding> {

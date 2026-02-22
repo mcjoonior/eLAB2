@@ -17,6 +17,7 @@ export type DeviceStatus = 'ACTIVE' | 'INACTIVE' | 'OUT_OF_SERVICE' | 'RETIRED';
 export type MaintenanceType = 'CALIBRATION' | 'INSPECTION' | 'SERVICE';
 export type MaintenanceResult = 'PASSED' | 'FAILED' | 'CONDITIONAL';
 export type OrderStatus = 'NEW' | 'IN_PROGRESS' | 'COMPLETED' | 'INVOICED' | 'CANCELLED';
+export type DashboardVariant = 'CLEAN' | 'MODERN' | 'OCEAN' | 'GRAPHITE';
 
 // ============================================================
 // Models
@@ -193,6 +194,7 @@ export interface CompanySettings {
   id: string;
   companyName: string;
   appSubtitle?: string;
+  dashboardVariant?: DashboardVariant;
   logoUrl?: string;
   address?: string;
   city?: string;
