@@ -16,12 +16,17 @@ const SamplesPage = lazy(() => import('@/pages/SamplesPage'));
 const SampleDetailPage = lazy(() => import('@/pages/SampleDetailPage'));
 const AnalysesPage = lazy(() => import('@/pages/AnalysesPage'));
 const AnalysisDetailPage = lazy(() => import('@/pages/AnalysisDetailPage'));
+const OrdersPage = lazy(() => import('@/pages/OrdersPage'));
+const OrderDetailPage = lazy(() => import('@/pages/OrderDetailPage'));
 const ArchivePage = lazy(() => import('@/pages/ArchivePage'));
 const ReportsPage = lazy(() => import('@/pages/ReportsPage'));
+const DevicesPage = lazy(() => import('@/pages/DevicesPage'));
+const DeviceDetailPage = lazy(() => import('@/pages/DeviceDetailPage'));
 const ImportPage = lazy(() => import('@/pages/ImportPage'));
 const AdminUsersPage = lazy(() => import('@/pages/AdminUsersPage'));
 const AdminSettingsPage = lazy(() => import('@/pages/AdminSettingsPage'));
 const AuditLogPage = lazy(() => import('@/pages/AuditLogPage'));
+const AdminPriceListPage = lazy(() => import('@/pages/AdminPriceListPage'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -69,9 +74,14 @@ export default function App() {
           <Route path="samples/:id" element={<SampleDetailPage />} />
           <Route path="analyses" element={<AnalysesPage />} />
           <Route path="analyses/:id" element={<AnalysisDetailPage />} />
+          <Route path="orders" element={<OrdersPage />} />
+          <Route path="orders/:id" element={<OrderDetailPage />} />
           <Route path="archive" element={<ArchivePage />} />
           <Route path="reports" element={<ReportsPage />} />
+          <Route path="devices" element={<DevicesPage />} />
+          <Route path="devices/:id" element={<DeviceDetailPage />} />
           <Route path="import" element={<AdminRoute><ImportPage /></AdminRoute>} />
+          <Route path="admin/price-list" element={<AdminRoute><AdminPriceListPage /></AdminRoute>} />
           <Route path="admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
           <Route path="admin/settings" element={<AdminRoute><AdminSettingsPage /></AdminRoute>} />
           <Route path="admin/audit-log" element={<AdminRoute><AuditLogPage /></AdminRoute>} />

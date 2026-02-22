@@ -1,24 +1,26 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Plus, Filter, X, Trash2 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Pagination } from '@/components/common/Pagination';
 import { analysisService } from '@/services/analysisService';
 import { sampleService } from '@/services/sampleService';
+import { priceListService } from '@/services/priceListService';
 import { useAuthStore } from '@/store/authStore';
 import {
   getAnalysisStatusColor,
   getAnalysisStatusLabel,
   formatDate,
 } from '@/utils/helpers';
-import type { Analysis, Sample, AnalysisStatus } from '@/types';
+import type { Analysis, Sample, AnalysisStatus, AnalysisPriceListItem } from '@/types';
 
 const ANALYSIS_STATUSES: AnalysisStatus[] = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'APPROVED', 'REJECTED'];
 
 export default function AnalysesPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const user = useAuthStore((s) => s.user);
   const isAdmin = user?.role === 'ADMIN';
 
@@ -40,8 +42,9 @@ export default function AnalysesPage() {
   // Create dialog
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [samples, setSamples] = useState<Sample[]>([]);
+  const [priceListItems, setPriceListItems] = useState<AnalysisPriceListItem[]>([]);
   const [samplesLoading, setSamplesLoading] = useState(false);
-  const [newAnalysis, setNewAnalysis] = useState({ sampleId: '', notes: '' });
+  const [newAnalysis, setNewAnalysis] = useState({ sampleId: '', priceListId: '', notes: '' });
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState('');
   const [confirmDeleteAnalysis, setConfirmDeleteAnalysis] = useState<Analysis | null>(null);
@@ -50,6 +53,17 @@ export default function AnalysesPage() {
     fetchAnalyses();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, filterStatus, filterDateFrom, filterDateTo]);
+
+  useEffect(() => {
+    const preselectedSampleId = searchParams.get('sampleId');
+    if (preselectedSampleId) {
+      openCreateDialog(preselectedSampleId);
+      const next = new URLSearchParams(searchParams);
+      next.delete('sampleId');
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function fetchAnalyses() {
     setLoading(true);
@@ -71,16 +85,20 @@ export default function AnalysesPage() {
     }
   }
 
-  async function openCreateDialog() {
+  async function openCreateDialog(prefilledSampleId?: string) {
     setShowCreateDialog(true);
     setCreateError('');
-    setNewAnalysis({ sampleId: '', notes: '' });
+    setNewAnalysis({ sampleId: prefilledSampleId || '', priceListId: '', notes: '' });
     setSamplesLoading(true);
     try {
-      const res = await sampleService.getAll({ limit: 200, status: 'REGISTERED' });
-      setSamples(res.data);
+      const [samplesRes, priceListRes] = await Promise.all([
+        sampleService.getAll({ limit: 200, status: 'REGISTERED' }),
+        priceListService.getAll({ limit: 200, isActive: true, analysisType: 'CHEMICAL' }),
+      ]);
+      setSamples(samplesRes.data);
+      setPriceListItems(priceListRes.data);
     } catch {
-      setCreateError('Nie udało się pobrać listy próbek.');
+      setCreateError('Nie udało się pobrać listy próbek lub cennika.');
     } finally {
       setSamplesLoading(false);
     }
@@ -92,11 +110,16 @@ export default function AnalysesPage() {
       setCreateError('Wybór próbki jest wymagany.');
       return;
     }
+    if (!newAnalysis.priceListId) {
+      setCreateError('Wybór pozycji cennika jest wymagany.');
+      return;
+    }
     setCreateLoading(true);
     setCreateError('');
     try {
       await analysisService.create({
         sampleId: newAnalysis.sampleId,
+        priceListId: newAnalysis.priceListId,
         notes: newAnalysis.notes || undefined,
       });
       setShowCreateDialog(false);
@@ -138,7 +161,7 @@ export default function AnalysesPage() {
           Analizy
         </h1>
         <button
-          onClick={openCreateDialog}
+          onClick={() => { void openCreateDialog(); }}
           className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-colors"
         >
           <Plus className="h-4 w-4" />
@@ -216,6 +239,7 @@ export default function AnalysesPage() {
                   <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Klient</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Proces</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Status</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Cennik</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Data</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Wykonał</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-700 dark:text-gray-300">{t('common.actions')}</th>
@@ -256,6 +280,9 @@ export default function AnalysesPage() {
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getAnalysisStatusColor(analysis.status)}`}>
                         {getAnalysisStatusLabel(analysis.status)}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                      {analysis.priceList ? `${analysis.priceList.code} (${analysis.priceList.priceNet} ${analysis.priceList.currency})` : '-'}
                     </td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                       {formatDate(analysis.analysisDate)}
@@ -374,6 +401,25 @@ export default function AnalysesPage() {
                     ))}
                   </select>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  Pozycja cennika *
+                </label>
+                <select
+                  value={newAnalysis.priceListId}
+                  onChange={(e) => setNewAnalysis({ ...newAnalysis, priceListId: e.target.value })}
+                  required
+                  className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                >
+                  <option value="">-- Wybierz pozycję cennika --</option>
+                  {priceListItems.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.code} - {item.name} ({item.priceNet} {item.currency})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>

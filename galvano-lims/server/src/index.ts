@@ -20,6 +20,9 @@ import dashboardRoutes from './routes/dashboard';
 import archiveRoutes from './routes/archive';
 import notificationRoutes from './routes/notifications';
 import searchRoutes from './routes/search';
+import deviceRoutes from './routes/devices';
+import orderRoutes from './routes/orders';
+import priceListRoutes from './routes/priceList';
 import { errorHandler } from './middleware/errorHandler';
 
 dotenv.config();
@@ -74,6 +77,9 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/archive', archiveRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/devices', deviceRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/price-list', priceListRoutes);
 
 // Public branding endpoint (no auth required)
 app.get('/api/branding', async (_req, res) => {

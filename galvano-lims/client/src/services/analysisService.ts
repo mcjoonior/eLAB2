@@ -15,7 +15,7 @@ export const analysisService = {
     return response.data;
   },
 
-  async create(data: { sampleId: string; notes?: string }): Promise<Analysis> {
+  async create(data: { sampleId: string; priceListId: string; notes?: string }): Promise<Analysis> {
     const response = await api.post('/analyses', data);
     return response.data;
   },

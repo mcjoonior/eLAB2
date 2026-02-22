@@ -13,6 +13,7 @@ import { AuthenticatedRequest } from '../middleware/auth';
 
 const createAnalysisSchema = z.object({
   sampleId: z.string().uuid('Nieprawidlowy identyfikator probki'),
+  priceListId: z.string().uuid('Nieprawidlowy identyfikator pozycji cennika'),
   analysisDate: z.string().datetime().optional().nullable(),
   notes: z.string().optional().nullable(),
 });
@@ -175,6 +176,7 @@ export const getAnalyses = async (req: AuthenticatedRequest, res: Response, next
               process: { select: { id: true, name: true, processType: true } },
             },
           },
+          priceList: { select: { id: true, code: true, name: true, priceNet: true, currency: true } },
           performer: { select: { id: true, firstName: true, lastName: true } },
           approver: { select: { id: true, firstName: true, lastName: true } },
           _count: { select: { results: true, recommendations: true } },
@@ -225,6 +227,7 @@ export const getAnalysisById = async (req: AuthenticatedRequest, res: Response, 
         },
         performer: { select: { id: true, firstName: true, lastName: true } },
         approver: { select: { id: true, firstName: true, lastName: true } },
+        priceList: { select: { id: true, code: true, name: true, priceNet: true, currency: true } },
         results: { orderBy: { createdAt: 'asc' } },
         recommendations: {
           orderBy: { priority: 'desc' },
@@ -271,9 +274,37 @@ export const createAnalysis = async (req: AuthenticatedRequest, res: Response, n
     const data = validation.data;
 
     // Sprawdz czy probka istnieje
-    const sample = await prisma.sample.findUnique({ where: { id: data.sampleId } });
+    const sample = await prisma.sample.findUnique({
+      where: { id: data.sampleId },
+      include: {
+        order: {
+          select: { id: true, orderCode: true, status: true },
+        },
+      },
+    });
     if (!sample) {
       res.status(404).json({ error: 'Probka nie zostala znaleziona' });
+      return;
+    }
+    if (!sample.orderId || !sample.order) {
+      res.status(400).json({ error: 'Probka musi byc przypisana do zlecenia przed utworzeniem analizy' });
+      return;
+    }
+    if (['COMPLETED', 'INVOICED', 'CANCELLED'].includes(sample.order.status)) {
+      res.status(400).json({ error: `Nie mozna dodac analizy do zlecenia w statusie "${sample.order.status}"` });
+      return;
+    }
+
+    const selectedPriceList = await prisma.analysisPriceList.findUnique({ where: { id: data.priceListId } });
+    if (!selectedPriceList || !selectedPriceList.isActive) {
+      res.status(404).json({ error: 'Wybrana pozycja cennika nie istnieje lub jest nieaktywna' });
+      return;
+    }
+
+    const analysisType = selectedPriceList.analysisType;
+    const allowedTypes = new Set(['CHEMICAL', 'CORROSION_TEST', 'SURFACE_ANALYSIS']);
+    if (!allowedTypes.has(analysisType)) {
+      res.status(400).json({ error: 'Pozycja cennika ma nieobsługiwany typ analizy' });
       return;
     }
 
@@ -283,8 +314,9 @@ export const createAnalysis = async (req: AuthenticatedRequest, res: Response, n
       data: {
         analysisCode,
         sampleId: data.sampleId,
+        priceListId: data.priceListId,
         performedBy: req.user!.userId,
-        analysisType: 'CHEMICAL' as any,
+        analysisType: analysisType as any,
         analysisDate: data.analysisDate ? new Date(data.analysisDate) : new Date(),
         notes: data.notes,
         status: 'PENDING',
@@ -298,6 +330,7 @@ export const createAnalysis = async (req: AuthenticatedRequest, res: Response, n
             process: { select: { id: true, name: true, processType: true } },
           },
         },
+        priceList: { select: { id: true, code: true, name: true, priceNet: true, currency: true } },
         performer: { select: { id: true, firstName: true, lastName: true } },
       },
     });
@@ -316,7 +349,12 @@ export const createAnalysis = async (req: AuthenticatedRequest, res: Response, n
         action: 'CREATE',
         entityType: 'ANALYSIS',
         entityId: analysis.id,
-        details: { analysisCode: analysis.analysisCode, sampleCode: sample.sampleCode },
+        details: {
+          analysisCode: analysis.analysisCode,
+          sampleCode: sample.sampleCode,
+          priceListId: selectedPriceList.id,
+          priceListCode: selectedPriceList.code,
+        },
       },
     });
 

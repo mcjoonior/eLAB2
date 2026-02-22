@@ -1,5 +1,5 @@
-import { useState, useEffect, type FormEvent, type MouseEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useMemo, type FormEvent, type MouseEvent } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Plus, Filter, Edit2, ChevronDown, X } from 'lucide-react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -8,6 +8,7 @@ import { sampleService } from '@/services/sampleService';
 import type { AssignableUser } from '@/services/sampleService';
 import { clientService } from '@/services/clientService';
 import { processService } from '@/services/processService';
+import { orderService } from '@/services/orderService';
 import { useAuthStore } from '@/store/authStore';
 import {
   getSampleStatusColor,
@@ -19,6 +20,7 @@ import type {
   Sample,
   Client,
   Process,
+  Order,
   SampleStatus,
   SampleType,
 } from '@/types';
@@ -36,12 +38,14 @@ const VALID_NEXT_STATUSES: Record<SampleStatus, SampleStatus[]> = {
 export default function SamplesPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const user = useAuthStore((s) => s.user);
 
   // Data
   const [samples, setSamples] = useState<Sample[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [processes, setProcesses] = useState<Process[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -64,6 +68,7 @@ export default function SamplesPage() {
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState('');
   const [newSample, setNewSample] = useState({
+    orderId: '',
     clientId: '',
     processId: '',
     sampleType: 'BATH' as SampleType,
@@ -76,24 +81,51 @@ export default function SamplesPage() {
   // Status change dropdown
   const [statusDropdownId, setStatusDropdownId] = useState<string | null>(null);
   const [statusMenuPosition, setStatusMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const selectedOrder = useMemo(
+    () => orders.find((order) => order.id === newSample.orderId) ?? null,
+    [orders, newSample.orderId],
+  );
 
   // Fetch reference data
   useEffect(() => {
     async function loadReferenceData() {
       try {
-        const [clientsRes, processesRes, usersRes] = await Promise.all([
+        const [clientsRes, processesRes, ordersRes, usersRes] = await Promise.all([
           clientService.getAll({ limit: 200, isActive: true }),
           processService.getAll({ limit: 200, isActive: true }),
+          orderService.getAll({ limit: 200 }),
           sampleService.getAssignableUsers(),
         ]);
         setClients(clientsRes.data);
         setProcesses(processesRes.data);
+        setOrders(ordersRes.data.filter((order) => ['NEW', 'IN_PROGRESS'].includes(order.status)));
         setAssignableUsers(usersRes);
       } catch {
         // Reference data loading failure is not critical
       }
     }
     loadReferenceData();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedOrder) return;
+    setNewSample((prev) => ({ ...prev, clientId: selectedOrder.clientId }));
+  }, [selectedOrder]);
+
+  useEffect(() => {
+    const prefilledOrderId = searchParams.get('orderId');
+    const openCreate = searchParams.get('openCreate');
+    if (!prefilledOrderId) return;
+
+    setNewSample((prev) => ({ ...prev, orderId: prefilledOrderId }));
+    if (openCreate === '1') {
+      setShowCreateDialog(true);
+    }
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('openCreate');
+    setSearchParams(nextParams, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fetch samples
@@ -126,6 +158,10 @@ export default function SamplesPage() {
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
+    if (!newSample.orderId) {
+      setCreateError('Wybór zlecenia jest wymagany.');
+      return;
+    }
     if (!newSample.clientId || !newSample.processId) {
       setCreateError('Klient i proces są wymagane.');
       return;
@@ -138,6 +174,7 @@ export default function SamplesPage() {
     setCreateError('');
     try {
       await sampleService.create({
+        orderId: newSample.orderId,
         clientId: newSample.clientId,
         processId: newSample.processId,
         sampleType: newSample.sampleType,
@@ -150,6 +187,7 @@ export default function SamplesPage() {
       });
       setShowCreateDialog(false);
       setNewSample({
+        orderId: '',
         clientId: '',
         processId: '',
         sampleType: 'BATH',
@@ -224,13 +262,21 @@ export default function SamplesPage() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           {t('samples.title')}
         </h1>
-        <button
-          onClick={() => setShowCreateDialog(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          {t('samples.addSample')}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/orders')}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            Przejdź do zleceń
+          </button>
+          <button
+            onClick={() => setShowCreateDialog(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            {t('samples.addSample')}
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -325,6 +371,7 @@ export default function SamplesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                  <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Zlecenie</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">{t('samples.sampleCode')}</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">{t('samples.client')}</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">{t('samples.process')}</th>
@@ -341,6 +388,9 @@ export default function SamplesPage() {
                     onClick={() => navigate(`/samples/${sample.id}`)}
                     className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors"
                   >
+                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
+                      {sample.order?.orderCode || '-'}
+                    </td>
                     <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
                       {sample.sampleCode}
                     </td>
@@ -464,6 +514,37 @@ export default function SamplesPage() {
             )}
 
             <form onSubmit={handleCreate} className="space-y-4">
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
+                Próbka musi być przypisana do aktywnego zlecenia (NOWE lub W TOKU).
+              </div>
+
+              {/* Order */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  Zlecenie *
+                </label>
+                <select
+                  value={newSample.orderId}
+                  onChange={(e) => {
+                    const order = orders.find((item) => item.id === e.target.value);
+                    setNewSample({
+                      ...newSample,
+                      orderId: e.target.value,
+                      clientId: order?.clientId || '',
+                    });
+                  }}
+                  required
+                  className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                >
+                  <option value="">-- Wybierz zlecenie --</option>
+                  {orders.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.orderCode} - {o.client?.companyName || o.clientId}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* Client */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
@@ -473,6 +554,7 @@ export default function SamplesPage() {
                   value={newSample.clientId}
                   onChange={(e) => setNewSample({ ...newSample, clientId: e.target.value })}
                   required
+                  disabled={!!selectedOrder}
                   className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
                 >
                   <option value="">-- Wybierz klienta --</option>
@@ -480,6 +562,11 @@ export default function SamplesPage() {
                     <option key={c.id} value={c.id}>{c.companyName}</option>
                   ))}
                 </select>
+                {selectedOrder && (
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Klient jest ustawiany automatycznie z wybranego zlecenia.
+                  </p>
+                )}
               </div>
 
               {/* Process */}

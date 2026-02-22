@@ -13,6 +13,10 @@ export type RecommendationType = 'INCREASE' | 'DECREASE' | 'MAINTAIN' | 'URGENT_
 export type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type ImportType = 'FULL' | 'CLIENTS_ONLY' | 'ANALYSES_ONLY' | 'PROCESSES_ONLY' | 'SAMPLES_ONLY';
 export type ImportStatus = 'UPLOADED' | 'VALIDATING' | 'VALIDATION_FAILED' | 'IMPORTING' | 'COMPLETED' | 'PARTIALLY_COMPLETED' | 'FAILED';
+export type DeviceStatus = 'ACTIVE' | 'INACTIVE' | 'OUT_OF_SERVICE' | 'RETIRED';
+export type MaintenanceType = 'CALIBRATION' | 'INSPECTION' | 'SERVICE';
+export type MaintenanceResult = 'PASSED' | 'FAILED' | 'CONDITIONAL';
+export type OrderStatus = 'NEW' | 'IN_PROGRESS' | 'COMPLETED' | 'INVOICED' | 'CANCELLED';
 
 // ============================================================
 // Models
@@ -85,6 +89,7 @@ export interface ProcessParameter {
 export interface Sample {
   id: string;
   sampleCode: string;
+  orderId?: string | null;
   clientId: string;
   processId: string;
   collectedBy?: string;
@@ -97,6 +102,11 @@ export interface Sample {
   client?: Client;
   process?: Process;
   collector?: User;
+  order?: {
+    id: string;
+    orderCode: string;
+    status: OrderStatus;
+  };
   analyses?: Analysis[];
 }
 
@@ -104,6 +114,7 @@ export interface Analysis {
   id: string;
   analysisCode: string;
   sampleId: string;
+  priceListId?: string | null;
   performedBy: string;
   analysisType: AnalysisType;
   analysisDate: string;
@@ -120,6 +131,7 @@ export interface Analysis {
   recommendations?: Recommendation[];
   reports?: Report[];
   attachments?: AnalysisAttachment[];
+  priceList?: Pick<AnalysisPriceListItem, 'id' | 'code' | 'name' | 'priceNet' | 'currency'>;
 }
 
 export interface AnalysisAttachment {
@@ -253,6 +265,110 @@ export interface Notification {
   isRead: boolean;
   link?: string;
   createdAt: string;
+}
+
+export interface LabDevice {
+  id: string;
+  code: string;
+  name: string;
+  deviceType: string;
+  manufacturer?: string | null;
+  model?: string | null;
+  serialNumber?: string | null;
+  location?: string | null;
+  status: DeviceStatus;
+  requiresCalibration: boolean;
+  requiresInspection: boolean;
+  calibrationIntervalDays?: number | null;
+  inspectionIntervalDays?: number | null;
+  lastCalibrationAt?: string | null;
+  nextCalibrationAt?: string | null;
+  lastInspectionAt?: string | null;
+  nextInspectionAt?: string | null;
+  responsibleUserId?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  responsibleUser?: User;
+  maintenanceLogs?: DeviceMaintenanceLog[];
+  _count?: {
+    maintenanceLogs: number;
+  };
+}
+
+export interface DeviceMaintenanceLog {
+  id: string;
+  deviceId: string;
+  maintenanceType: MaintenanceType;
+  performedAt: string;
+  result: MaintenanceResult;
+  certificateNumber?: string | null;
+  certificatePath?: string | null;
+  notes?: string | null;
+  performedBy?: string | null;
+  nextDueAt?: string | null;
+  createdAt: string;
+  performer?: User;
+}
+
+export interface AnalysisPriceListItem {
+  id: string;
+  code: string;
+  name: string;
+  analysisType: string;
+  description?: string | null;
+  unit?: string | null;
+  priceNet: number;
+  vatRate: number;
+  currency: string;
+  isActive: boolean;
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderItem {
+  id: string;
+  orderId: string;
+  sampleId?: string | null;
+  analysisId?: string | null;
+  priceListId?: string | null;
+  description: string;
+  quantity: number;
+  unitPriceNet: number;
+  vatRate: number;
+  lineTotalNet: number;
+  lineTotalGross: number;
+  createdAt: string;
+  updatedAt: string;
+  sample?: Pick<Sample, 'id' | 'sampleCode'>;
+  analysis?: Pick<Analysis, 'id' | 'analysisCode' | 'analysisType'>;
+  priceList?: Pick<AnalysisPriceListItem, 'id' | 'code' | 'name'>;
+}
+
+export interface Order {
+  id: string;
+  orderCode: string;
+  clientId: string;
+  status: OrderStatus;
+  currency: string;
+  notes?: string | null;
+  manualAdjustmentNet: number;
+  manualAdjustmentVatRate: number;
+  totalNet: number;
+  totalGross: number;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  client?: Client;
+  creator?: User;
+  samples?: Sample[];
+  items?: OrderItem[];
+  _count?: {
+    samples: number;
+    items: number;
+  };
 }
 
 // ============================================================

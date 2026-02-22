@@ -21,6 +21,11 @@ async function main() {
   // Clean existing data
   await prisma.auditLog.deleteMany();
   await prisma.notification.deleteMany();
+  await prisma.deviceMaintenanceLog.deleteMany();
+  await prisma.labDevice.deleteMany();
+  await prisma.orderItem.deleteMany();
+  await prisma.order.deleteMany();
+  await prisma.analysisPriceList.deleteMany();
   await prisma.report.deleteMany();
   await prisma.recommendation.deleteMany();
   await prisma.analysisResult.deleteMany();
@@ -79,6 +84,26 @@ async function main() {
   });
 
   console.log('🏢 Utworzono ustawienia firmy.\n');
+
+  // ============================================================
+  // 2b. ANALYSIS PRICE LIST
+  // ============================================================
+  await prisma.analysisPriceList.create({
+    data: {
+      code: 'CHEMICAL_STD',
+      name: 'Analiza chemiczna - standard',
+      analysisType: 'CHEMICAL',
+      description: 'Podstawowa analiza chemiczna próbki',
+      unit: 'szt.',
+      priceNet: 120,
+      vatRate: 23,
+      currency: 'PLN',
+      isActive: true,
+      effectiveFrom: new Date(),
+    },
+  });
+
+  console.log('💰 Utworzono domyslny cennik analiz.\n');
 
   // ============================================================
   // 3. PROCESS TYPES

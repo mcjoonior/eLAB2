@@ -9,6 +9,7 @@ import { AuthenticatedRequest } from '../middleware/auth';
 // ============================================================
 
 const createSampleSchema = z.object({
+  orderId: z.string().uuid('Nieprawidłowy identyfikator zlecenia'),
   clientId: z.string().uuid('Nieprawidłowy identyfikator klienta'),
   processId: z.string().uuid('Nieprawidłowy identyfikator procesu'),
   collectedBy: z.string().uuid().optional().nullable(),
@@ -138,6 +139,7 @@ export const getSamples = async (req: AuthenticatedRequest, res: Response, next:
         { sampleCode: { contains: search as string, mode: 'insensitive' } },
         { description: { contains: search as string, mode: 'insensitive' } },
         { client: { companyName: { contains: search as string, mode: 'insensitive' } } },
+        { order: { orderCode: { contains: search as string, mode: 'insensitive' } } },
       ];
     }
 
@@ -155,6 +157,7 @@ export const getSamples = async (req: AuthenticatedRequest, res: Response, next:
           client: { select: { id: true, companyName: true } },
           process: { select: { id: true, name: true, processType: true } },
           collector: { select: { id: true, firstName: true, lastName: true } },
+          order: { select: { id: true, orderCode: true, status: true } },
           _count: { select: { analyses: true } },
         },
       }),
@@ -198,6 +201,7 @@ export const getSampleById = async (req: AuthenticatedRequest, res: Response, ne
           },
         },
         collector: { select: { id: true, firstName: true, lastName: true } },
+        order: { select: { id: true, orderCode: true, status: true } },
         analyses: {
           orderBy: { createdAt: 'desc' },
           include: {
@@ -252,6 +256,27 @@ export const createSample = async (req: AuthenticatedRequest, res: Response, nex
       return;
     }
 
+    const order = await prisma.order.findUnique({
+      where: { id: data.orderId },
+      select: { id: true, orderCode: true, status: true, clientId: true },
+    });
+    if (!order) {
+      res.status(404).json({ error: 'Zlecenie nie zostało znalezione' });
+      return;
+    }
+
+    if (!['NEW', 'IN_PROGRESS'].includes(order.status)) {
+      res.status(400).json({
+        error: `Nie można dodać próbki do zlecenia w statusie "${order.status}"`,
+      });
+      return;
+    }
+
+    if (order.clientId !== data.clientId) {
+      res.status(400).json({ error: 'Wybrany klient nie pasuje do klienta zlecenia' });
+      return;
+    }
+
     const assignedUserId = data.collectedBy ?? req.user!.userId;
     const assignedUser = await prisma.user.findFirst({
       where: { id: assignedUserId, isActive: true },
@@ -267,6 +292,7 @@ export const createSample = async (req: AuthenticatedRequest, res: Response, nex
     const sample = await prisma.sample.create({
       data: {
         sampleCode,
+        orderId: data.orderId,
         clientId: data.clientId,
         processId: data.processId,
         collectedBy: assignedUser.id,
@@ -279,6 +305,7 @@ export const createSample = async (req: AuthenticatedRequest, res: Response, nex
         client: { select: { id: true, companyName: true } },
         process: { select: { id: true, name: true, processType: true } },
         collector: { select: { id: true, firstName: true, lastName: true } },
+        order: { select: { id: true, orderCode: true, status: true } },
       },
     });
 
@@ -300,7 +327,7 @@ export const createSample = async (req: AuthenticatedRequest, res: Response, nex
         action: 'CREATE',
         entityType: 'SAMPLE',
         entityId: sample.id,
-        details: { sampleCode: sample.sampleCode, clientName: client.companyName },
+        details: { sampleCode: sample.sampleCode, clientName: client.companyName, orderCode: order.orderCode },
       },
     });
 

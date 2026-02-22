@@ -13,8 +13,11 @@ import {
   FileText,
   Upload,
   Settings,
+  Tags,
   Shield,
   Beaker,
+  Wrench,
+  ClipboardList,
   X,
 } from 'lucide-react';
 
@@ -41,12 +44,15 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { to: '/processes', icon: FlaskConical, label: t('nav.processes') },
     { to: '/samples', icon: TestTubes, label: t('nav.samples') },
     { to: '/analyses', icon: Microscope, label: t('nav.analyses') },
+    { to: '/orders', icon: ClipboardList, label: t('nav.orders') },
     { to: '/archive', icon: Archive, label: t('nav.archive') },
     { to: '/reports', icon: FileText, label: t('nav.reports') },
+    { to: '/devices', icon: Wrench, label: t('nav.devices') },
     ...(isAdmin ? [{ to: '/import', icon: Upload, label: t('nav.import') }] : []),
   ];
 
   const adminItems = [
+    { to: '/admin/price-list', icon: Tags, label: t('nav.priceList') },
     { to: '/admin/users', icon: Shield, label: t('nav.users') },
     { to: '/admin/settings', icon: Settings, label: t('nav.settings') },
     { to: '/admin/audit-log', icon: FileText, label: t('nav.auditLog') },

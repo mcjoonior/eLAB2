@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Plus, FlaskConical, Clock, User, FileText } from 'lucide-react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { sampleService } from '@/services/sampleService';
-import { analysisService } from '@/services/analysisService';
 import {
   getSampleStatusColor,
   getSampleStatusLabel,
@@ -32,7 +31,6 @@ export default function SampleDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [statusLoading, setStatusLoading] = useState(false);
-  const [createAnalysisLoading, setCreateAnalysisLoading] = useState(false);
 
   useEffect(() => {
     if (id) fetchSample();
@@ -67,15 +65,7 @@ export default function SampleDetailPage() {
 
   async function handleCreateAnalysis() {
     if (!sample) return;
-    setCreateAnalysisLoading(true);
-    try {
-      const analysis = await analysisService.create({ sampleId: sample.id });
-      navigate(`/analyses/${analysis.id}`);
-    } catch {
-      setError('Nie udało się utworzyć analizy dla tej próbki.');
-    } finally {
-      setCreateAnalysisLoading(false);
-    }
+    navigate(`/analyses?sampleId=${sample.id}`);
   }
 
   if (loading) {
@@ -243,14 +233,9 @@ export default function SampleDetailPage() {
           </h2>
           <button
             onClick={handleCreateAnalysis}
-            disabled={createAnalysisLoading}
             className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
           >
-            {createAnalysisLoading ? (
-              <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <Plus className="h-4 w-4" />
-            )}
+            <Plus className="h-4 w-4" />
             {t('analyses.addAnalysis')}
           </button>
         </div>

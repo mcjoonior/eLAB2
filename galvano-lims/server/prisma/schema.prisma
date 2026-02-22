@@ -99,6 +99,33 @@ enum ImportStatus {
   FAILED
 }
 
+enum DeviceStatus {
+  ACTIVE
+  INACTIVE
+  OUT_OF_SERVICE
+  RETIRED
+}
+
+enum MaintenanceType {
+  CALIBRATION
+  INSPECTION
+  SERVICE
+}
+
+enum MaintenanceResult {
+  PASSED
+  FAILED
+  CONDITIONAL
+}
+
+enum OrderStatus {
+  NEW
+  IN_PROGRESS
+  COMPLETED
+  INVOICED
+  CANCELLED
+}
+
 // ============================================================
 // MODELS
 // ============================================================
@@ -121,6 +148,9 @@ model User {
   recommendations    Recommendation[] @relation("CreatedBy")
   collectedSamples   Sample[]        @relation("CollectedBy")
   importJobs         ImportJob[]     @relation("ImportedBy")
+  responsibleForDevices LabDevice[] @relation("DeviceResponsible")
+  performedMaintenanceLogs DeviceMaintenanceLog[] @relation("MaintenancePerformedBy")
+  createdOrders      Order[]         @relation("OrderCreatedBy")
   auditLogs          AuditLog[]
 
   @@map("users")
@@ -146,6 +176,7 @@ model Client {
   // Relations
   samples   Sample[]
   processes Process[] @relation("ClientProcesses")
+  orders    Order[]
 
   @@map("clients")
 }
@@ -208,6 +239,7 @@ model Sample {
   sampleType  SampleType   @default(BATH)
   description String?
   status      SampleStatus @default(REGISTERED)
+  orderId     String?
   legacyCode  String?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
@@ -216,7 +248,9 @@ model Sample {
   client    Client    @relation(fields: [clientId], references: [id])
   process   Process   @relation(fields: [processId], references: [id])
   collector User?     @relation("CollectedBy", fields: [collectedBy], references: [id])
+  order     Order?    @relation(fields: [orderId], references: [id])
   analyses  Analysis[]
+  orderItems OrderItem[]
 
   @@map("samples")
 }
@@ -225,6 +259,7 @@ model Analysis {
   id           String         @id @default(uuid())
   analysisCode String         @unique
   sampleId     String
+  priceListId  String?
   performedBy  String
   analysisDate DateTime       @default(now())
   status       AnalysisStatus @default(PENDING)
@@ -238,12 +273,14 @@ model Analysis {
 
   // Relations
   sample          Sample            @relation(fields: [sampleId], references: [id])
+  priceList       AnalysisPriceList? @relation(fields: [priceListId], references: [id], onDelete: SetNull)
   performer       User              @relation("PerformedBy", fields: [performedBy], references: [id])
   approver        User?             @relation("ApprovedBy", fields: [approvedBy], references: [id])
   results         AnalysisResult[]
   recommendations Recommendation[]
   reports         Report[]
   attachments     AnalysisAttachment[]
+  orderItems      OrderItem[]
 
   @@map("analyses")
 }
@@ -385,6 +422,132 @@ model ImportTemplate {
   updatedAt   DateTime @updatedAt
 
   @@map("import_templates")
+}
+
+model AnalysisPriceList {
+  id            String   @id @default(uuid())
+  code          String
+  name          String
+  analysisType  String
+  description   String?
+  unit          String?
+  priceNet      Decimal  @db.Decimal(12, 2)
+  vatRate       Decimal  @default(23) @db.Decimal(5, 2)
+  currency      String   @default("PLN")
+  isActive      Boolean  @default(true)
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  orderItems OrderItem[]
+  analyses   Analysis[]
+
+  @@index([analysisType, effectiveFrom, isActive])
+  @@unique([code, effectiveFrom])
+  @@map("analysis_price_list")
+}
+
+model Order {
+  id                      String      @id @default(uuid())
+  orderCode               String      @unique
+  clientId                String
+  status                  OrderStatus @default(NEW)
+  currency                String      @default("PLN")
+  notes                   String?
+  manualAdjustmentNet     Decimal     @default(0) @db.Decimal(12, 2)
+  manualAdjustmentVatRate Decimal     @default(23) @db.Decimal(5, 2)
+  totalNet                Decimal     @default(0) @db.Decimal(12, 2)
+  totalGross              Decimal     @default(0) @db.Decimal(12, 2)
+  createdBy               String?
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  client  Client     @relation(fields: [clientId], references: [id])
+  creator User?      @relation("OrderCreatedBy", fields: [createdBy], references: [id])
+  samples Sample[]
+  items   OrderItem[]
+
+  @@index([clientId, status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id            String   @id @default(uuid())
+  orderId       String
+  sampleId      String?
+  analysisId    String?
+  priceListId   String?
+  description   String
+  quantity      Decimal  @default(1) @db.Decimal(12, 3)
+  unitPriceNet  Decimal  @db.Decimal(12, 2)
+  vatRate       Decimal  @default(23) @db.Decimal(5, 2)
+  lineTotalNet  Decimal  @db.Decimal(12, 2)
+  lineTotalGross Decimal @db.Decimal(12, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  order     Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sample    Sample?            @relation(fields: [sampleId], references: [id], onDelete: SetNull)
+  analysis  Analysis?          @relation(fields: [analysisId], references: [id], onDelete: SetNull)
+  priceList AnalysisPriceList? @relation(fields: [priceListId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([sampleId])
+  @@index([analysisId])
+  @@map("order_items")
+}
+
+model LabDevice {
+  id                     String       @id @default(uuid())
+  code                   String       @unique
+  name                   String
+  deviceType             String
+  manufacturer           String?
+  model                  String?
+  serialNumber           String?      @unique
+  location               String?
+  status                 DeviceStatus @default(ACTIVE)
+  requiresCalibration    Boolean      @default(true)
+  requiresInspection     Boolean      @default(false)
+  calibrationIntervalDays Int?
+  inspectionIntervalDays Int?
+  lastCalibrationAt      DateTime?
+  nextCalibrationAt      DateTime?
+  lastInspectionAt       DateTime?
+  nextInspectionAt       DateTime?
+  responsibleUserId      String?
+  notes                  String?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  responsibleUser User? @relation("DeviceResponsible", fields: [responsibleUserId], references: [id])
+  maintenanceLogs DeviceMaintenanceLog[]
+
+  @@index([status])
+  @@index([nextCalibrationAt])
+  @@index([nextInspectionAt])
+  @@map("lab_devices")
+}
+
+model DeviceMaintenanceLog {
+  id                String            @id @default(uuid())
+  deviceId          String
+  maintenanceType   MaintenanceType
+  performedAt       DateTime
+  result            MaintenanceResult @default(PASSED)
+  certificateNumber String?
+  certificatePath   String?
+  notes             String?
+  performedBy       String?
+  nextDueAt         DateTime?
+  createdAt         DateTime          @default(now())
+
+  device    LabDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  performer User?     @relation("MaintenancePerformedBy", fields: [performedBy], references: [id])
+
+  @@index([deviceId, performedAt])
+  @@map("device_maintenance_logs")
 }
 
 model AuditLog {

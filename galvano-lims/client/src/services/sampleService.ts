@@ -28,7 +28,15 @@ export const sampleService = {
     return response.data;
   },
 
-  async create(data: Partial<Sample>): Promise<Sample> {
+  async create(data: {
+    orderId: string;
+    clientId: string;
+    processId: string;
+    sampleType: Sample['sampleType'];
+    description?: string;
+    collectedAt?: string;
+    collectedBy?: string;
+  }): Promise<Sample> {
     const response = await api.post('/samples', data);
     return response.data;
   },
