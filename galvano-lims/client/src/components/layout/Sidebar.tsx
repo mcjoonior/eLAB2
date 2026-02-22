@@ -88,6 +88,18 @@ const sidebarThemes: Record<DashboardVariant, SidebarTheme> = {
     userName: 'text-white',
     userRole: 'text-zinc-200/80',
   },
+  LIGHT_CONCEPT: {
+    aside: 'bg-[#1B1D24] text-[#B0B3BC] border-r-0 shadow-xl lg:rounded-r-xl',
+    headerBorder: 'border-b border-white/10',
+    closeHover: 'hover:bg-white/10',
+    navActive: 'bg-gradient-to-r from-indigo-500/35 to-sky-500/25 text-white',
+    navInactive: 'text-[#B0B3BC] hover:bg-white/10 hover:text-white',
+    adminLabel: 'text-white/30',
+    footer: 'border-t border-white/10',
+    avatar: 'bg-gradient-to-br from-orange-400 to-pink-500 text-white',
+    userName: 'text-white',
+    userRole: 'text-white/45',
+  },
 };
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {

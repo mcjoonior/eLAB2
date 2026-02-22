@@ -26,6 +26,7 @@ const brandTextColors: Record<DashboardVariant, string> = {
   MODERN: 'text-foreground',
   OCEAN: 'text-teal-700 dark:text-teal-300',
   GRAPHITE: 'text-slate-700 dark:text-slate-200',
+  LIGHT_CONCEPT: 'text-[#1A1C22]',
 };
 
 export function Topbar({ onMenuClick }: TopbarProps) {
@@ -90,6 +91,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   const variant: DashboardVariant = branding?.dashboardVariant || 'CLEAN';
   const logoUrl = branding?.logoUrl || null;
   const companyName = branding?.companyName || 'eLAB LIMS';
+  const isLightConcept = variant === 'LIGHT_CONCEPT';
 
   async function handleMarkAsRead(id: string, link?: string) {
     try {
@@ -112,7 +114,11 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   }
 
   return (
-    <header className="sticky top-0 z-30 h-16 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
+    <header className={`sticky top-0 z-30 h-16 ${
+      isLightConcept
+        ? 'border-b border-black/10 bg-[#F6F4F0]'
+        : 'border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60'
+    }`}>
       <div className="flex items-center justify-between h-full px-4">
         {/* Left */}
         <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -126,7 +132,9 @@ export function Topbar({ onMenuClick }: TopbarProps) {
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="hidden lg:flex items-center gap-3 rounded-lg px-2 py-1 hover:bg-accent transition-colors flex-shrink-0"
+            className={`hidden lg:flex items-center gap-3 rounded-lg px-2 py-1 transition-colors flex-shrink-0 ${
+              isLightConcept ? 'hover:bg-white/70' : 'hover:bg-accent'
+            }`}
           >
             <div className="h-10 w-[130px] flex items-center justify-center overflow-hidden">
               {logoUrl ? (
@@ -153,7 +161,11 @@ export function Topbar({ onMenuClick }: TopbarProps) {
           <div className="relative" ref={quickActionsRef}>
             <button
               onClick={() => setShowQuickActions(!showQuickActions)}
-              className="p-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+              className={`p-1.5 rounded-md transition-colors ${
+                isLightConcept
+                  ? 'bg-white border border-black/10 text-[#5C5F6A] hover:text-[#1A1C22] hover:border-black/20'
+                  : 'bg-primary text-primary-foreground hover:bg-primary/90'
+              }`}
               title={t('dashboard.quickActions')}
             >
               <Plus className="h-4 w-4" />

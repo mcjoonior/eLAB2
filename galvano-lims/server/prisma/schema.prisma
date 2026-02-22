@@ -131,6 +131,7 @@ enum DashboardVariant {
   MODERN
   OCEAN
   GRAPHITE
+  LIGHT_CONCEPT
 }
 
 enum ThemeMode {

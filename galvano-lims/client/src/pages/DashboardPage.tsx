@@ -135,9 +135,33 @@ function getKpiStyles(tone: KpiTone, variant: DashboardVariant) {
     },
   };
 
+  const lightConceptStyles: Record<KpiTone, { card: string; icon: string }> = {
+    blue: {
+      card: 'bg-[#E4F4FB]',
+      icon: 'bg-[#118AB2]/15 text-[#118AB2]',
+    },
+    amber: {
+      card: 'bg-[#FFF3E8]',
+      icon: 'bg-[#FF8C42]/15 text-[#FF8C42]',
+    },
+    violet: {
+      card: 'bg-[#F0ECFF]',
+      icon: 'bg-[#7B61FF]/15 text-[#7B61FF]',
+    },
+    emerald: {
+      card: 'bg-[#E6FBF4]',
+      icon: 'bg-[#06D6A0]/20 text-[#059669]',
+    },
+    cyan: {
+      card: 'bg-[#FFF0F0]',
+      icon: 'bg-[#FF6B6B]/15 text-[#FF6B6B]',
+    },
+  };
+
   if (variant === 'MODERN') return modernStyles[tone];
   if (variant === 'OCEAN') return oceanStyles[tone];
   if (variant === 'GRAPHITE') return graphiteStyles[tone];
+  if (variant === 'LIGHT_CONCEPT') return lightConceptStyles[tone];
   return cleanStyles[tone];
 }
 
@@ -184,12 +208,14 @@ export default function DashboardPage() {
   }
 
   const isColorVariant = dashboardVariant !== 'CLEAN';
+  const isLightConcept = dashboardVariant === 'LIGHT_CONCEPT';
 
   const wrapperClassByVariant: Record<DashboardVariant, string> = {
     CLEAN: 'space-y-6',
     MODERN: 'space-y-6 rounded-3xl bg-gradient-to-br from-slate-50 via-blue-50/70 to-cyan-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 p-4 sm:p-6',
     OCEAN: 'space-y-6 rounded-3xl bg-gradient-to-br from-teal-50 via-cyan-50/70 to-sky-50 dark:from-slate-900 dark:via-cyan-950/60 dark:to-blue-950/60 p-4 sm:p-6',
     GRAPHITE: 'space-y-6 rounded-3xl bg-gradient-to-br from-zinc-100 via-slate-100/70 to-gray-100 dark:from-zinc-900 dark:via-gray-900 dark:to-slate-900 p-4 sm:p-6',
+    LIGHT_CONCEPT: 'space-y-6 bg-[#F6F4F0] -m-4 md:-m-6 p-4 md:p-6 min-h-full',
   };
 
   const kpis: KpiCard[] = [
@@ -246,12 +272,26 @@ export default function DashboardPage() {
     ? 'rounded-xl border border-slate-200/70 dark:border-gray-700/80 bg-white/85 dark:bg-gray-800/85 backdrop-blur-sm'
     : 'rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800';
 
+  const todayLabel = new Intl.DateTimeFormat('pl-PL', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    weekday: 'short',
+  }).format(new Date());
+
   return (
     <div className={wrapperClassByVariant[dashboardVariant]}>
       <div className="flex items-center justify-between">
-        <h1 className={isColorVariant ? 'text-3xl font-bold tracking-tight text-slate-900 dark:text-white' : 'text-2xl font-bold text-gray-900 dark:text-white'}>
-          {t('dashboard.title')}
-        </h1>
+        <div className="flex items-center gap-3">
+          <h1 className={isColorVariant ? 'text-3xl font-bold tracking-tight text-slate-900 dark:text-white' : 'text-2xl font-bold text-gray-900 dark:text-white'}>
+            {t('dashboard.title')}
+          </h1>
+          {isLightConcept && (
+            <span className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-medium text-gray-500">
+              {todayLabel}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
@@ -259,7 +299,14 @@ export default function DashboardPage() {
           const Icon = card.icon;
           const styles = getKpiStyles(card.tone, dashboardVariant);
           return (
-            <div key={card.key} className={`${styles.card} rounded-xl border border-gray-200/80 dark:border-gray-700 p-4`}>
+            <div
+              key={card.key}
+              className={`${styles.card} rounded-xl border p-4 ${
+                isLightConcept
+                  ? 'border-black/5 hover:-translate-y-0.5 hover:shadow-md transition-all'
+                  : 'border-gray-200/80 dark:border-gray-700'
+              }`}
+            >
               <div className="flex items-start gap-3">
                 <div className={`rounded-lg p-2 ${styles.icon}`}>
                   <Icon className="h-4 w-4" />

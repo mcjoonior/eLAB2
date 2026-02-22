@@ -246,6 +246,7 @@ export default function AdminSettingsPage() {
                   <option value="MODERN">Nowoczesny</option>
                   <option value="OCEAN">Ocean</option>
                   <option value="GRAPHITE">Grafit</option>
+                  <option value="LIGHT_CONCEPT">Light Concept</option>
                 </select>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Wybierz styl strony głównej i panelu bocznego dla wszystkich użytkowników.</p>
               </div>

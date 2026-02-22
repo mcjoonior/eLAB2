@@ -91,7 +91,7 @@ const updateUserSchema = z.object({
 const updateSettingsSchema = z.object({
   companyName: z.string().min(2, 'Nazwa firmy musi miec co najmniej 2 znaki.').optional(),
   appSubtitle: z.string().optional().nullable(),
-  dashboardVariant: z.enum(['CLEAN', 'MODERN', 'OCEAN', 'GRAPHITE']).optional(),
+  dashboardVariant: z.enum(['CLEAN', 'MODERN', 'OCEAN', 'GRAPHITE', 'LIGHT_CONCEPT']).optional(),
   themeMode: z.enum(['LIGHT', 'DARK']).optional(),
   address: z.string().optional().nullable(),
   city: z.string().optional().nullable(),

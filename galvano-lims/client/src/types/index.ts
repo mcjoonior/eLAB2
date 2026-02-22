@@ -17,7 +17,7 @@ export type DeviceStatus = 'ACTIVE' | 'INACTIVE' | 'OUT_OF_SERVICE' | 'RETIRED';
 export type MaintenanceType = 'CALIBRATION' | 'INSPECTION' | 'SERVICE';
 export type MaintenanceResult = 'PASSED' | 'FAILED' | 'CONDITIONAL';
 export type OrderStatus = 'NEW' | 'IN_PROGRESS' | 'COMPLETED' | 'INVOICED' | 'CANCELLED';
-export type DashboardVariant = 'CLEAN' | 'MODERN' | 'OCEAN' | 'GRAPHITE';
+export type DashboardVariant = 'CLEAN' | 'MODERN' | 'OCEAN' | 'GRAPHITE' | 'LIGHT_CONCEPT';
 export type ThemeMode = 'LIGHT' | 'DARK';
 
 // ============================================================
