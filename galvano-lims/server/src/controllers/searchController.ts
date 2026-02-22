@@ -13,7 +13,7 @@ export const globalSearch = async (req: AuthenticatedRequest, res: Response, nex
 
     const limitNum = Math.min(10, Math.max(1, parseInt(limit as string, 10) || 5));
 
-    const [clients, samples, analyses, processes] = await Promise.all([
+    const [clients, samples, analyses, processes, orders] = await Promise.all([
       prisma.client.findMany({
         where: {
           isActive: true,
@@ -86,9 +86,32 @@ export const globalSearch = async (req: AuthenticatedRequest, res: Response, nex
         orderBy: { name: 'asc' },
         select: { id: true, name: true, processType: true, description: true },
       }),
+
+      prisma.order.findMany({
+        where: {
+          OR: [
+            { orderCode: { contains: q, mode: 'insensitive' } },
+            { notes: { contains: q, mode: 'insensitive' } },
+            { client: { companyName: { contains: q, mode: 'insensitive' } } },
+          ],
+        },
+        take: limitNum,
+        orderBy: { updatedAt: 'desc' },
+        select: {
+          id: true,
+          orderCode: true,
+          status: true,
+          client: {
+            select: {
+              id: true,
+              companyName: true,
+            },
+          },
+        },
+      }),
     ]);
 
-    res.json({ clients, samples, analyses, processes });
+    res.json({ clients, samples, analyses, processes, orders });
   } catch (error) {
     next(error);
   }

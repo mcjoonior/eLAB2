@@ -1,10 +1,22 @@
 import { useState } from 'react';
+import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
+import { getBranding } from '@/services/adminService';
+import { useThemeStore } from '@/store/themeStore';
 
 export function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { setTheme } = useThemeStore();
+
+  useEffect(() => {
+    getBranding()
+      .then((branding) => {
+        setTheme(branding.themeMode === 'DARK' ? 'dark' : 'light');
+      })
+      .catch(() => {});
+  }, [setTheme]);
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">

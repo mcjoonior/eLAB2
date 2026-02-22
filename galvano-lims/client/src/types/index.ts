@@ -18,6 +18,7 @@ export type MaintenanceType = 'CALIBRATION' | 'INSPECTION' | 'SERVICE';
 export type MaintenanceResult = 'PASSED' | 'FAILED' | 'CONDITIONAL';
 export type OrderStatus = 'NEW' | 'IN_PROGRESS' | 'COMPLETED' | 'INVOICED' | 'CANCELLED';
 export type DashboardVariant = 'CLEAN' | 'MODERN' | 'OCEAN' | 'GRAPHITE';
+export type ThemeMode = 'LIGHT' | 'DARK';
 
 // ============================================================
 // Models
@@ -195,6 +196,7 @@ export interface CompanySettings {
   companyName: string;
   appSubtitle?: string;
   dashboardVariant?: DashboardVariant;
+  themeMode?: ThemeMode;
   logoUrl?: string;
   address?: string;
   city?: string;

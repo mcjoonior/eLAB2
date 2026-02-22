@@ -324,11 +324,12 @@
     "print": "Drukuj"
   },
   "search": {
-    "placeholder": "Szukaj klienta, próbkę, analizę lub proces...",
+    "placeholder": "Szukaj klienta, próbki, analizy, procesu lub zlecenia...",
     "noResults": "Brak wyników dla",
     "clients": "Klienci",
     "samples": "Próbki",
     "analyses": "Analizy",
-    "processes": "Procesy"
+    "processes": "Procesy",
+    "orders": "Zlecenia"
   }
 }

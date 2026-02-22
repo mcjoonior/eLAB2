@@ -33,6 +33,12 @@ export interface GlobalSearchResults {
     processType: string;
     description?: string;
   }>;
+  orders: Array<{
+    id: string;
+    orderCode: string;
+    status: string;
+    client?: { id: string; companyName: string };
+  }>;
 }
 
 export async function globalSearch(q: string, limit = 5): Promise<GlobalSearchResults> {

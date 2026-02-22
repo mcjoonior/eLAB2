@@ -133,6 +133,11 @@ enum DashboardVariant {
   GRAPHITE
 }
 
+enum ThemeMode {
+  LIGHT
+  DARK
+}
+
 // ============================================================
 // MODELS
 // ============================================================
@@ -371,6 +376,7 @@ model CompanySettings {
   companyName      String  @default("Laboratorium Galwaniczne")
   appSubtitle      String? @default("LIMS")
   dashboardVariant DashboardVariant @default(CLEAN)
+  themeMode        ThemeMode @default(LIGHT)
   logoUrl          String?
   address          String?
   city             String?

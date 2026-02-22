@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Search, Building2, TestTube2, FlaskConical, Cog, Loader2 } from 'lucide-react';
+import { Search, Building2, TestTube2, FlaskConical, Cog, Loader2, ClipboardList } from 'lucide-react';
 import { globalSearch, type GlobalSearchResults } from '@/services/searchService';
 import {
   getAnalysisStatusColor,
@@ -34,6 +34,7 @@ export function GlobalSearchDropdown() {
     for (const s of results.samples) items.push({ type: 'sample', id: s.id, path: `/samples/${s.id}` });
     for (const a of results.analyses) items.push({ type: 'analysis', id: a.id, path: `/analyses/${a.id}` });
     for (const p of results.processes) items.push({ type: 'process', id: p.id, path: `/processes/${p.id}` });
+    for (const o of results.orders) items.push({ type: 'order', id: o.id, path: `/orders/${o.id}` });
     return items;
   }, [results]);
 
@@ -112,7 +113,7 @@ export function GlobalSearchDropdown() {
   }
 
   const totalResults = results
-    ? results.clients.length + results.samples.length + results.analyses.length + results.processes.length
+    ? results.clients.length + results.samples.length + results.analyses.length + results.processes.length + results.orders.length
     : 0;
 
   // Track running index for keyboard nav highlighting
@@ -216,6 +217,26 @@ export function GlobalSearchDropdown() {
                         <span className="ml-2 inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 dark:text-gray-300">
                           {p.processType}
                         </span>
+                      </ResultItem>
+                    );
+                  })}
+                </Section>
+              )}
+
+              {/* Orders */}
+              {results.orders.length > 0 && (
+                <Section icon={ClipboardList} label={t('search.orders')}>
+                  {results.orders.map((o) => {
+                    const idx = runningIndex++;
+                    return (
+                      <ResultItem key={o.id} active={idx === activeIndex} onClick={() => goTo(`/orders/${o.id}`)}>
+                        <span className="font-medium text-gray-900 dark:text-white">{o.orderCode}</span>
+                        <span className="ml-2 inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 dark:text-gray-300">
+                          {o.status}
+                        </span>
+                        {o.client && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">{o.client.companyName}</span>
+                        )}
                       </ResultItem>
                     );
                   })}

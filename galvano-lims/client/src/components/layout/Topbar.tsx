@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
-import { useThemeStore } from '@/store/themeStore';
 import { notificationService, getBranding, type Branding } from '@/services/adminService';
 import { authService } from '@/services/authService';
 import { GlobalSearchDropdown } from '@/components/common/GlobalSearchDropdown';
@@ -11,8 +10,6 @@ import type { Notification, DashboardVariant } from '@/types';
 import {
   Menu,
   Bell,
-  Sun,
-  Moon,
   Globe,
   LogOut,
   Plus,
@@ -35,7 +32,6 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
-  const { theme, setTheme } = useThemeStore();
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -85,10 +81,6 @@ export function Topbar({ onMenuClick }: TopbarProps) {
     } catch { /* ignore */ }
     logout();
     navigate('/login');
-  };
-
-  const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
   };
 
   const toggleLanguage = () => {
@@ -195,15 +187,6 @@ export function Topbar({ onMenuClick }: TopbarProps) {
           >
             <Globe className="h-4 w-4" />
             <span className="ml-1 text-xs font-medium">{i18n.language.toUpperCase()}</span>
-          </button>
-
-          {/* Theme toggle */}
-          <button
-            onClick={toggleTheme}
-            className="p-2 rounded-md hover:bg-accent text-muted-foreground"
-            title={theme === 'dark' ? t('common.lightMode') : t('common.darkMode')}
-          >
-            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
 
           {/* Notifications */}
