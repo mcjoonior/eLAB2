@@ -8,7 +8,6 @@ export interface CreatePriceListItemPayload {
   description?: string;
   unit?: string;
   priceNet: number;
-  vatRate?: number;
   currency?: string;
   isActive?: boolean;
   effectiveFrom: string;

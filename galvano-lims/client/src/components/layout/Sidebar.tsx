@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
 import { getBranding, type Branding } from '@/services/adminService';
@@ -28,6 +28,7 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const isAdmin = (user?.role || '').toUpperCase() === 'ADMIN';
   const [branding, setBranding] = useState<Branding | null>(null);
@@ -80,7 +81,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           <button onClick={onClose} className="lg:hidden absolute top-2 right-2 p-1 rounded hover:bg-accent">
             <X className="h-5 w-5" />
           </button>
-          <div className="flex flex-col items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              navigate('/');
+            }}
+            className="flex w-full flex-col items-center gap-3 rounded-lg p-1 hover:bg-accent"
+          >
             {logoUrl ? (
               <img src={logoUrl} alt="Logo" className="max-h-12 max-w-[180px] object-contain rounded" />
             ) : (
@@ -89,7 +97,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             <h1 className="text-sm font-bold text-foreground leading-tight truncate text-center w-full">
               {branding?.companyName || 'eLAB LIMS'}
             </h1>
-          </div>
+          </button>
         </div>
 
         {/* Navigation */}

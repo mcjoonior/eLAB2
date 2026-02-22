@@ -167,6 +167,7 @@
     "title": "Zlecenia klientów",
     "addOrder": "Nowe zlecenie",
     "orderCode": "Kod zlecenia",
+    "totalNet": "Wartość netto",
     "totalGross": "Wartość brutto",
     "recalculate": "Przelicz",
     "search": "Szukaj po kodzie, kliencie, notatce...",

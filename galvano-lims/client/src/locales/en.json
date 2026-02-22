@@ -167,6 +167,7 @@
     "title": "Client Orders",
     "addOrder": "New Order",
     "orderCode": "Order Code",
+    "totalNet": "Net Total",
     "totalGross": "Gross Total",
     "recalculate": "Recalculate",
     "search": "Search by code, client, note...",

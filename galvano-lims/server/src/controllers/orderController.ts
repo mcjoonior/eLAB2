@@ -10,14 +10,14 @@ const createOrderSchema = z.object({
   notes: z.string().optional().nullable(),
   currency: z.string().min(3).max(3).optional().default('PLN'),
   manualAdjustmentNet: z.number().optional().default(0),
-  manualAdjustmentVatRate: z.number().min(0).max(100).optional().default(23),
+  manualAdjustmentVatRate: z.number().min(0).max(100).optional().default(0),
 });
 
 const updateOrderSchema = z.object({
   sampleIds: z.array(z.string().uuid()).optional(),
   notes: z.string().optional().nullable(),
   manualAdjustmentNet: z.number().optional(),
-  manualAdjustmentVatRate: z.number().min(0).max(100).optional(),
+  manualAdjustmentVatRate: z.number().min(0).max(100).optional().default(0),
 });
 
 const changeOrderStatusSchema = z.object({
@@ -28,7 +28,7 @@ const addManualItemSchema = z.object({
   description: z.string().min(2),
   quantity: z.number().positive().optional().default(1),
   unitPriceNet: z.number().positive(),
-  vatRate: z.number().min(0).max(100).optional().default(23),
+  vatRate: z.number().min(0).max(100).optional().default(0),
   sampleId: z.string().uuid().optional().nullable(),
   priceListId: z.string().uuid().optional().nullable(),
 });
@@ -116,10 +116,10 @@ async function recalculateOrder(orderId: string) {
         if (!price) continue;
 
         const unitPriceNet = Number(price.priceNet);
-        const vatRate = Number(price.vatRate);
+        const vatRate = 0;
         const quantity = 1;
         const lineTotalNet = roundCurrency(unitPriceNet * quantity);
-        const lineTotalGross = roundCurrency(lineTotalNet * (1 + vatRate / 100));
+        const lineTotalGross = lineTotalNet;
 
         autoItemsToCreate.push({
           orderId,
@@ -143,15 +143,11 @@ async function recalculateOrder(orderId: string) {
     const allItems = await tx.orderItem.findMany({ where: { orderId } });
 
     const itemsNet = roundCurrency(allItems.reduce((sum, i) => sum + Number(i.lineTotalNet), 0));
-    const itemsGross = roundCurrency(allItems.reduce((sum, i) => sum + Number(i.lineTotalGross), 0));
 
     const manualAdjustmentNet = Number(order.manualAdjustmentNet);
-    const manualAdjustmentGross = roundCurrency(
-      manualAdjustmentNet * (1 + Number(order.manualAdjustmentVatRate) / 100),
-    );
 
     const totalNet = roundCurrency(itemsNet + manualAdjustmentNet);
-    const totalGross = roundCurrency(itemsGross + manualAdjustmentGross);
+    const totalGross = totalNet;
 
     return tx.order.update({
       where: { id: orderId },
@@ -314,7 +310,7 @@ export const createOrder = async (req: AuthenticatedRequest, res: Response, next
           notes: data.notes?.trim() ?? null,
           currency: data.currency.toUpperCase(),
           manualAdjustmentNet: data.manualAdjustmentNet,
-          manualAdjustmentVatRate: data.manualAdjustmentVatRate,
+          manualAdjustmentVatRate: 0,
           createdBy: req.user!.userId,
           status: 'NEW',
         },
@@ -386,7 +382,7 @@ export const updateOrder = async (req: AuthenticatedRequest, res: Response, next
         data: {
           notes: data.notes !== undefined ? (data.notes?.trim() ?? null) : undefined,
           manualAdjustmentNet: data.manualAdjustmentNet,
-          manualAdjustmentVatRate: data.manualAdjustmentVatRate,
+          manualAdjustmentVatRate: 0,
         },
       });
 
@@ -493,7 +489,7 @@ export const addManualOrderItem = async (req: AuthenticatedRequest, res: Respons
     const data = validation.data;
     const quantity = data.quantity ?? 1;
     const lineTotalNet = roundCurrency(data.unitPriceNet * quantity);
-    const lineTotalGross = roundCurrency(lineTotalNet * (1 + (data.vatRate ?? 23) / 100));
+    const lineTotalGross = lineTotalNet;
 
     const item = await prisma.orderItem.create({
       data: {
@@ -503,7 +499,7 @@ export const addManualOrderItem = async (req: AuthenticatedRequest, res: Respons
         description: data.description.trim(),
         quantity,
         unitPriceNet: data.unitPriceNet,
-        vatRate: data.vatRate ?? 23,
+        vatRate: 0,
         lineTotalNet,
         lineTotalGross,
       },

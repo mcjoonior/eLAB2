@@ -35,7 +35,6 @@ export default function AdminPriceListPage() {
     description: '',
     unit: 'szt.',
     priceNet: '0',
-    vatRate: '23',
     currency: 'PLN',
     isActive: true,
     effectiveFrom: new Date().toISOString().slice(0, 10),
@@ -79,7 +78,6 @@ export default function AdminPriceListPage() {
       description: '',
       unit: 'szt.',
       priceNet: '0',
-      vatRate: '23',
       currency: 'PLN',
       isActive: true,
       effectiveFrom: new Date().toISOString().slice(0, 10),
@@ -103,7 +101,6 @@ export default function AdminPriceListPage() {
       description: item.description || '',
       unit: item.unit || '',
       priceNet: String(item.priceNet),
-      vatRate: String(item.vatRate),
       currency: item.currency,
       isActive: item.isActive,
       effectiveFrom: fromIsoToDateInput(item.effectiveFrom),
@@ -129,7 +126,6 @@ export default function AdminPriceListPage() {
       description: form.description || undefined,
       unit: form.unit || undefined,
       priceNet: parseFloat(form.priceNet) || 0,
-      vatRate: parseFloat(form.vatRate) || 23,
       currency: (form.currency || 'PLN').toUpperCase(),
       isActive: form.isActive,
       effectiveFrom: toIsoFromDateInput(form.effectiveFrom),
@@ -209,20 +205,48 @@ export default function AdminPriceListPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <input value={form.code} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))} placeholder={t('priceList.code')} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700" required />
-            <input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} placeholder={t('priceList.name')} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700" required />
-            <input value={form.analysisType} onChange={(e) => setForm((prev) => ({ ...prev, analysisType: e.target.value.toUpperCase() }))} placeholder={t('priceList.analysisType')} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700" required />
-            <input value={form.priceNet} onChange={(e) => setForm((prev) => ({ ...prev, priceNet: e.target.value }))} type="number" step="0.01" placeholder={t('priceList.priceNet')} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700" required />
-            <input value={form.vatRate} onChange={(e) => setForm((prev) => ({ ...prev, vatRate: e.target.value }))} type="number" step="0.01" placeholder={t('priceList.vatRate')} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700" required />
-            <input value={form.currency} onChange={(e) => setForm((prev) => ({ ...prev, currency: e.target.value.toUpperCase() }))} placeholder={t('priceList.currency')} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700" required />
-            <input value={form.unit} onChange={(e) => setForm((prev) => ({ ...prev, unit: e.target.value }))} placeholder={t('priceList.unit')} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700" />
-            <input value={form.effectiveFrom} onChange={(e) => setForm((prev) => ({ ...prev, effectiveFrom: e.target.value }))} type="date" className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700" required />
-            <input value={form.effectiveTo} onChange={(e) => setForm((prev) => ({ ...prev, effectiveTo: e.target.value }))} type="date" className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700" />
-            <input value={form.description} onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))} placeholder={t('common.details')} className="md:col-span-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700" />
-            <label className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600">
-              <input type="checkbox" checked={form.isActive} onChange={(e) => setForm((prev) => ({ ...prev, isActive: e.target.checked }))} />
-              {t('common.active')}
-            </label>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">{t('priceList.code')}</label>
+              <input value={form.code} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700" required />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">{t('priceList.name')}</label>
+              <input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700" required />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">{t('priceList.analysisType')}</label>
+              <input value={form.analysisType} onChange={(e) => setForm((prev) => ({ ...prev, analysisType: e.target.value.toUpperCase() }))} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700" required />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">{t('priceList.priceNet')}</label>
+              <input value={form.priceNet} onChange={(e) => setForm((prev) => ({ ...prev, priceNet: e.target.value }))} type="number" step="0.01" className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700" required />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">{t('priceList.currency')}</label>
+              <input value={form.currency} onChange={(e) => setForm((prev) => ({ ...prev, currency: e.target.value.toUpperCase() }))} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700" required />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">{t('priceList.unit')}</label>
+              <input value={form.unit} onChange={(e) => setForm((prev) => ({ ...prev, unit: e.target.value }))} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">{t('priceList.effectiveFrom')}</label>
+              <input value={form.effectiveFrom} onChange={(e) => setForm((prev) => ({ ...prev, effectiveFrom: e.target.value }))} type="date" className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700" required />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">{t('common.to')}</label>
+              <input value={form.effectiveTo} onChange={(e) => setForm((prev) => ({ ...prev, effectiveTo: e.target.value }))} type="date" className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700" />
+            </div>
+            <div className="flex items-end">
+              <label className="inline-flex w-full items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600">
+                <input type="checkbox" checked={form.isActive} onChange={(e) => setForm((prev) => ({ ...prev, isActive: e.target.checked }))} />
+                {t('common.active')}
+              </label>
+            </div>
+            <div className="md:col-span-3">
+              <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">{t('common.details')}</label>
+              <input value={form.description} onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700" />
+            </div>
           </div>
 
           <div className="mt-4 flex justify-end">
@@ -247,7 +271,6 @@ export default function AdminPriceListPage() {
                   <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300">{t('priceList.name')}</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300">{t('priceList.analysisType')}</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300">{t('priceList.priceNet')}</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300">VAT %</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300">{t('priceList.effectiveFrom')}</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300">{t('common.status')}</th>
                   <th className="px-4 py-3 text-right font-medium text-gray-700 dark:text-gray-300">{t('common.actions')}</th>
@@ -260,7 +283,6 @@ export default function AdminPriceListPage() {
                     <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{item.name}</td>
                     <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{item.analysisType}</td>
                     <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{formatNumber(item.priceNet)} {item.currency}</td>
-                    <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{formatNumber(item.vatRate)}</td>
                     <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{formatDate(item.effectiveFrom)}</td>
                     <td className="px-4 py-3">
                       {item.isActive ? (

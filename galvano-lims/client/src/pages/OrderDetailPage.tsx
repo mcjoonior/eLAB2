@@ -39,7 +39,6 @@ export default function OrderDetailPage() {
   const [selectedSampleIds, setSelectedSampleIds] = useState<string[]>([]);
   const [notes, setNotes] = useState('');
   const [manualAdjustmentNet, setManualAdjustmentNet] = useState('0');
-  const [manualAdjustmentVatRate, setManualAdjustmentVatRate] = useState('23');
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -48,7 +47,6 @@ export default function OrderDetailPage() {
   const [manualItemDescription, setManualItemDescription] = useState('');
   const [manualItemQuantity, setManualItemQuantity] = useState('1');
   const [manualItemPriceNet, setManualItemPriceNet] = useState('');
-  const [manualItemVatRate, setManualItemVatRate] = useState('23');
   const [addingManualItem, setAddingManualItem] = useState(false);
 
   useEffect(() => {
@@ -65,7 +63,6 @@ export default function OrderDetailPage() {
       setOrder(data);
       setNotes(data.notes || '');
       setManualAdjustmentNet(String(data.manualAdjustmentNet || 0));
-      setManualAdjustmentVatRate(String(data.manualAdjustmentVatRate || 23));
 
       const linkedSampleIds = (data.samples || []).map((s) => s.id);
       setSelectedSampleIds(linkedSampleIds);
@@ -108,7 +105,6 @@ export default function OrderDetailPage() {
         sampleIds: selectedSampleIds,
         notes: notes || null,
         manualAdjustmentNet: parseFloat(manualAdjustmentNet) || 0,
-        manualAdjustmentVatRate: parseFloat(manualAdjustmentVatRate) || 23,
       });
       setOrder(updated);
     } catch {
@@ -148,13 +144,11 @@ export default function OrderDetailPage() {
         description: manualItemDescription,
         quantity: parseFloat(manualItemQuantity) || 1,
         unitPriceNet: parseFloat(manualItemPriceNet),
-        vatRate: parseFloat(manualItemVatRate) || 23,
       });
       setOrder(updated);
       setManualItemDescription('');
       setManualItemQuantity('1');
       setManualItemPriceNet('');
-      setManualItemVatRate('23');
     } catch {
       setError(t('orders.manualItemError'));
     } finally {
@@ -233,12 +227,12 @@ export default function OrderDetailPage() {
 
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
-            <p className="text-xs text-gray-500 dark:text-gray-400">{t('orders.totalGross')}</p>
-            <p className="text-lg font-semibold text-gray-900 dark:text-white">{formatNumber(order.totalGross)} {order.currency}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{t('orders.totalNet')}</p>
+            <p className="text-lg font-semibold text-gray-900 dark:text-white">{formatNumber(order.totalNet)} {order.currency}</p>
           </div>
           <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
-            <p className="text-xs text-gray-500 dark:text-gray-400">NET</p>
-            <p className="text-lg font-semibold text-gray-900 dark:text-white">{formatNumber(order.totalNet)} {order.currency}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Pozycje</p>
+            <p className="text-lg font-semibold text-gray-900 dark:text-white">{order.items?.length || 0}</p>
           </div>
           <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
             <p className="text-xs text-gray-500 dark:text-gray-400">{t('common.createdAt')}</p>
@@ -267,16 +261,6 @@ export default function OrderDetailPage() {
               step="0.01"
               value={manualAdjustmentNet}
               onChange={(e) => setManualAdjustmentNet(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">{t('orders.manualAdjustmentVatRate')}</label>
-            <input
-              type="number"
-              step="0.01"
-              value={manualAdjustmentVatRate}
-              onChange={(e) => setManualAdjustmentVatRate(e.target.value)}
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700"
             />
           </div>
@@ -337,7 +321,7 @@ export default function OrderDetailPage() {
             {autoItems.map((item) => (
               <div key={item.id} className="rounded-lg border border-gray-200 p-3 text-sm dark:border-gray-700">
                 <p className="font-medium text-gray-900 dark:text-white">{item.description}</p>
-                <p className="text-gray-500 dark:text-gray-400">{formatNumber(item.lineTotalGross)} {order.currency}</p>
+                <p className="text-gray-500 dark:text-gray-400">{formatNumber(item.lineTotalNet)} {order.currency}</p>
               </div>
             ))}
             {autoItems.length === 0 && <p className="text-sm text-gray-500 dark:text-gray-400">{t('common.noData')}</p>}
@@ -355,7 +339,7 @@ export default function OrderDetailPage() {
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700"
               required
             />
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <input
                 type="number"
                 step="0.001"
@@ -373,14 +357,6 @@ export default function OrderDetailPage() {
                 className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700"
                 required
               />
-              <input
-                type="number"
-                step="0.01"
-                value={manualItemVatRate}
-                onChange={(e) => setManualItemVatRate(e.target.value)}
-                placeholder="VAT %"
-                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700"
-              />
             </div>
             <button
               type="submit"
@@ -397,7 +373,7 @@ export default function OrderDetailPage() {
               <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 p-3 text-sm dark:border-gray-700">
                 <div>
                   <p className="font-medium text-gray-900 dark:text-white">{item.description}</p>
-                  <p className="text-gray-500 dark:text-gray-400">{formatNumber(item.lineTotalGross)} {order.currency}</p>
+                  <p className="text-gray-500 dark:text-gray-400">{formatNumber(item.lineTotalNet)} {order.currency}</p>
                 </div>
                 <button
                   onClick={() => handleRemoveManualItem(item.id)}

@@ -208,7 +208,7 @@ export default function OrdersPage() {
                     <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300">{t('orders.orderCode')}</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300">{t('samples.client')}</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300">{t('common.status')}</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300">{t('orders.totalGross')}</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300">{t('orders.totalNet')}</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300">{t('common.createdAt')}</th>
                     <th className="px-4 py-3 text-right font-medium text-gray-700 dark:text-gray-300">{t('common.actions')}</th>
                   </tr>
@@ -227,7 +227,7 @@ export default function OrdersPage() {
                           {statusLabel(order.status)}
                         </span>
                       </td>
-                      <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white">{formatNumber(order.totalGross)} {order.currency}</td>
+                      <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white">{formatNumber(order.totalNet)} {order.currency}</td>
                       <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{formatDate(order.createdAt)}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="inline-flex items-center gap-2">
