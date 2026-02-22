@@ -489,34 +489,37 @@ export default function SamplesPage() {
 
       {/* Create Dialog */}
       {showCreateDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:items-center">
           <div
             className="fixed inset-0 bg-black/50"
             onClick={() => setShowCreateDialog(false)}
           />
-          <div className="relative z-10 w-full max-w-lg rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {t('samples.addSample')}
-              </h2>
-              <button
-                onClick={() => setShowCreateDialog(false)}
-                className="rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {createError && (
-              <div className="mb-4 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 p-3 text-sm text-red-700 dark:text-red-400">
-                {createError}
+          <div className="relative z-10 w-full max-w-4xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800">
+            <div className="max-h-[calc(100vh-2rem)] overflow-y-auto p-6">
+              <div className="mb-6 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {t('samples.addSample')}
+                </h2>
+                <button
+                  onClick={() => setShowCreateDialog(false)}
+                  className="rounded-lg p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
-            )}
 
-            <form onSubmit={handleCreate} className="space-y-4">
+              {createError && (
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400">
+                  {createError}
+                </div>
+              )}
+
+              <form onSubmit={handleCreate} className="space-y-4">
               <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
                 Próbka musi być przypisana do aktywnego zlecenia (NOWE lub W TOKU).
               </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
 
               {/* Order */}
               <div>
@@ -588,7 +591,7 @@ export default function SamplesPage() {
               </div>
 
               {/* Sample Type */}
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                   Przypisanie próbki *
                 </label>
@@ -674,7 +677,7 @@ export default function SamplesPage() {
               </div>
 
               {/* Description */}
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                   {t('samples.description')}
                 </label>
@@ -686,26 +689,28 @@ export default function SamplesPage() {
                   placeholder="Opcjonalny opis próbki..."
                 />
               </div>
-
-              {/* Actions */}
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateDialog(false)}
-                  className="rounded-lg px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  type="submit"
-                  disabled={createLoading}
-                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-                >
-                  {createLoading && <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-                  {t('samples.addSample')}
-                </button>
               </div>
-            </form>
+
+                {/* Actions */}
+                <div className="sticky bottom-0 -mx-6 mt-4 flex items-center justify-end gap-3 border-t border-gray-200 bg-white px-6 pt-3 dark:border-gray-700 dark:bg-gray-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateDialog(false)}
+                    className="rounded-lg px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                  >
+                    {t('common.cancel')}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={createLoading}
+                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {createLoading && <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
+                    {t('samples.addSample')}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
