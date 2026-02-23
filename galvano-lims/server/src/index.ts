@@ -120,6 +120,22 @@ app.listen(PORT, () => {
   console.log(`🚀 Serwer LIMS uruchomiony na porcie ${PORT}`);
 });
 
+// Keepalive: detect stale connections (e.g. after postgres restart) and reconnect
+setInterval(async () => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+  } catch {
+    console.error('[DB] Keepalive failed — attempting reconnect...');
+    try {
+      await prisma.$disconnect();
+      await prisma.$connect();
+      console.log('[DB] Reconnected successfully.');
+    } catch (e) {
+      console.error('[DB] Reconnect failed:', e);
+    }
+  }
+}, 60 * 1000);
+
 const shutdown = async () => {
   await prisma.$disconnect();
   process.exit(0);

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { Prisma } from '@prisma/client';
+import { PrismaClientKnownRequestError, PrismaClientValidationError } from '@prisma/client/runtime/library';
 import { ZodError } from 'zod';
 
 // ---------------------------------------------------------------------------
@@ -29,7 +29,7 @@ export class AppError extends Error {
 // Helper – translate common Prisma error codes to Polish messages
 // ---------------------------------------------------------------------------
 
-function handlePrismaError(error: Prisma.PrismaClientKnownRequestError): {
+function handlePrismaError(error: PrismaClientKnownRequestError): {
   statusCode: number;
   message: string;
   details?: unknown;
@@ -62,6 +62,13 @@ function handlePrismaError(error: Prisma.PrismaClientKnownRequestError): {
       return {
         statusCode: 400,
         message: 'Błąd interpretacji zapytania. Sprawdź przesłane dane.',
+      };
+    case 'P1000':
+    case 'P1001':
+    case 'P1002':
+      return {
+        statusCode: 503,
+        message: 'Baza danych jest chwilowo niedostępna. Spróbuj ponownie za kilka sekund.',
       };
     default:
       return {
@@ -120,7 +127,7 @@ export function errorHandler(
   }
 
   // ---- Prisma known request errors ----
-  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+  if (err instanceof PrismaClientKnownRequestError) {
     const { statusCode, message, details } = handlePrismaError(err);
     res.status(statusCode).json({
       success: false,
@@ -131,7 +138,7 @@ export function errorHandler(
   }
 
   // ---- Prisma validation errors ----
-  if (err instanceof Prisma.PrismaClientValidationError) {
+  if (err instanceof PrismaClientValidationError) {
     res.status(400).json({
       success: false,
       message: 'Błąd walidacji danych po stronie bazy danych. Sprawdź typy i wymagane pola.',
