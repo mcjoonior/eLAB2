@@ -2,6 +2,16 @@ import { Request, Response, NextFunction } from 'express';
 import { PrismaClientKnownRequestError, PrismaClientValidationError, PrismaClientInitializationError } from '@prisma/client/runtime/library';
 import { ZodError } from 'zod';
 
+// Fire-and-forget reconnect — uses dynamic import to avoid circular dependency with index.ts
+function triggerReconnect(): void {
+  import('../index').then(({ prisma }) => {
+    prisma.$disconnect()
+      .then(() => prisma.$connect())
+      .then(() => console.log('[DB] Reconnected after connection error.'))
+      .catch((e: unknown) => console.error('[DB] Reconnect failed:', e));
+  }).catch(() => {});
+}
+
 // ---------------------------------------------------------------------------
 // Custom application error
 // ---------------------------------------------------------------------------
@@ -128,6 +138,7 @@ export function errorHandler(
 
   // ---- Prisma initialization / connection errors (P1xxx) ----
   if (err instanceof PrismaClientInitializationError) {
+    triggerReconnect();
     res.status(503).json({
       success: false,
       message: 'Baza danych jest chwilowo niedostępna. Spróbuj ponownie za kilka sekund.',
@@ -138,6 +149,9 @@ export function errorHandler(
   // ---- Prisma known request errors ----
   if (err instanceof PrismaClientKnownRequestError) {
     const { statusCode, message, details } = handlePrismaError(err);
+    if (err.code === 'P1000' || err.code === 'P1001' || err.code === 'P1002') {
+      triggerReconnect();
+    }
     res.status(statusCode).json({
       success: false,
       message,
