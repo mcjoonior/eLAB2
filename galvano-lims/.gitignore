@@ -7,3 +7,4 @@ uploads/
 reports/
 *.tsbuildinfo
 coverage/
+docker-compose.override.yml

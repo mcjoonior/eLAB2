@@ -1,0 +1,30 @@
+# Production overrides — copy this file to docker-compose.override.yml on the server
+# and fill in the real values. Docker Compose merges it automatically.
+#
+# NEVER commit docker-compose.override.yml to git.
+#
+# Generate secrets with:  openssl rand -hex 64
+
+services:
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: REPLACE_WITH_STRONG_PASSWORD
+
+  server:
+    environment:
+      DATABASE_URL: postgresql://postgres:REPLACE_WITH_STRONG_PASSWORD@postgres:5432/galvano_lims?schema=public&connection_limit=10&pool_timeout=30&connect_timeout=30
+      JWT_SECRET: REPLACE_WITH_64_CHAR_RANDOM_STRING
+      JWT_REFRESH_SECRET: REPLACE_WITH_ANOTHER_64_CHAR_RANDOM_STRING
+      CORS_ORIGIN: http://YOUR_VPS_IP_OR_DOMAIN:5173
+
+      # Optional — email notifications
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: "587"
+      SMTP_USER: your-email@gmail.com
+      SMTP_PASSWORD: your-app-password
+      SMTP_FROM: laboratorium@example.com
+
+      # Optional — GUS BIR company registry integration
+      GUS_ENABLED: "true"
+      GUS_BIR_URL: https://wyszukiwarkaregon.stat.gov.pl/wsBIR/UslugaBIRzewnPubl.svc
+      GUS_BIR_KEY: your-gus-api-key

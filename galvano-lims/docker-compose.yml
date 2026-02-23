@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -29,17 +27,21 @@ services:
       dockerfile: Dockerfile
     container_name: galvano-lims-server
     restart: unless-stopped
-    env_file:
-      - ./server/.env
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/galvano_lims?schema=public&connection_limit=10&pool_timeout=30&connect_timeout=30
-      JWT_SECRET: galvano-lims-jwt-secret-change-in-production
-      JWT_REFRESH_SECRET: galvano-lims-refresh-secret-change-in-production
+      JWT_SECRET: dev-jwt-secret-change-in-production
+      JWT_REFRESH_SECRET: dev-jwt-refresh-secret-change-in-production
       JWT_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
       PORT: 3001
       NODE_ENV: production
       CORS_ORIGIN: http://localhost:5173
+      GUS_ENABLED: "false"
+      GUS_BIR_URL: https://wyszukiwarkaregon.stat.gov.pl/wsBIR/UslugaBIRzewnPubl.svc
+      GUS_BIR_KEY: ""
+      GUS_TIMEOUT_MS: "12000"
+      UPLOAD_DIR: ./uploads
+      REPORTS_DIR: ./reports
     ports:
       - "3001:3001"
     depends_on:
