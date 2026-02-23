@@ -8,7 +8,10 @@ npx prisma db push --skip-generate
 USER_COUNT=$(node -e "
   const { PrismaClient } = require('@prisma/client');
   const p = new PrismaClient();
-  p.user.count().then(c => { console.log(c); p.\$disconnect(); });
+  p.user.count()
+    .then(c => { console.log(c); return p.\$disconnect(); })
+    .then(() => process.exit(0))
+    .catch(() => { console.log('0'); process.exit(0); });
 ")
 
 if [ "$USER_COUNT" = "0" ]; then

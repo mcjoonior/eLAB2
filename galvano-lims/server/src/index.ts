@@ -117,4 +117,12 @@ app.listen(PORT, () => {
   console.log(`🚀 Serwer LIMS uruchomiony na porcie ${PORT}`);
 });
 
+const shutdown = async () => {
+  await prisma.$disconnect();
+  process.exit(0);
+};
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
+
 export default app;
