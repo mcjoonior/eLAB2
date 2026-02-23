@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { PrismaClientKnownRequestError, PrismaClientValidationError } from '@prisma/client/runtime/library';
+import { PrismaClientKnownRequestError, PrismaClientValidationError, PrismaClientInitializationError } from '@prisma/client/runtime/library';
 import { ZodError } from 'zod';
 
 // ---------------------------------------------------------------------------
@@ -123,6 +123,15 @@ export function errorHandler(
   if (err instanceof ZodError) {
     const { statusCode, message, details } = handleZodError(err);
     res.status(statusCode).json({ success: false, message, details });
+    return;
+  }
+
+  // ---- Prisma initialization / connection errors (P1xxx) ----
+  if (err instanceof PrismaClientInitializationError) {
+    res.status(503).json({
+      success: false,
+      message: 'Baza danych jest chwilowo niedostępna. Spróbuj ponownie za kilka sekund.',
+    });
     return;
   }
 
