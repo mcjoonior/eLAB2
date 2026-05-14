@@ -462,3 +462,44 @@ export const changeSampleStatus = async (req: AuthenticatedRequest, res: Respons
     next(error);
   }
 };
+
+// ============================================================
+// DELETE /:id - Usunięcie próbki (tylko ADMIN, tylko gdy brak analiz)
+// ============================================================
+
+export const deleteSample = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    const sample = await prisma.sample.findUnique({
+      where: { id },
+      include: { _count: { select: { analyses: true } } },
+    });
+
+    if (!sample) {
+      res.status(404).json({ error: 'Próbka nie została znaleziona' });
+      return;
+    }
+
+    if ((sample._count as any).analyses > 0) {
+      res.status(400).json({ error: 'Nie można usunąć próbki, która ma przypisane analizy.' });
+      return;
+    }
+
+    await prisma.sample.delete({ where: { id } });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.userId,
+        action: 'DELETE',
+        entityType: 'SAMPLE',
+        entityId: id,
+        details: { sampleCode: sample.sampleCode },
+      },
+    });
+
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+};

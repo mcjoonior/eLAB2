@@ -4,9 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Plus, Trash2, Calculator } from 'lucide-react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { orderService } from '@/services/orderService';
-import { sampleService } from '@/services/sampleService';
 import { formatDate, formatNumber } from '@/utils/helpers';
-import type { Order, OrderStatus, Sample } from '@/types';
+import type { Order, OrderStatus } from '@/types';
 
 const ORDER_STATUSES: OrderStatus[] = ['NEW', 'IN_PROGRESS', 'COMPLETED', 'INVOICED', 'CANCELLED'];
 
@@ -35,8 +34,6 @@ export default function OrderDetailPage() {
   const { t } = useTranslation();
 
   const [order, setOrder] = useState<Order | null>(null);
-  const [availableSamples, setAvailableSamples] = useState<Sample[]>([]);
-  const [selectedSampleIds, setSelectedSampleIds] = useState<string[]>([]);
   const [notes, setNotes] = useState('');
   const [manualAdjustmentNet, setManualAdjustmentNet] = useState('0');
 
@@ -63,14 +60,6 @@ export default function OrderDetailPage() {
       setOrder(data);
       setNotes(data.notes || '');
       setManualAdjustmentNet(String(data.manualAdjustmentNet || 0));
-
-      const linkedSampleIds = (data.samples || []).map((s) => s.id);
-      setSelectedSampleIds(linkedSampleIds);
-
-      if (data.clientId) {
-        const sampleRes = await sampleService.getAll({ clientId: data.clientId, limit: 200 });
-        setAvailableSamples(sampleRes.data);
-      }
     } catch {
       setError(t('orders.fetchError'));
     } finally {
@@ -88,12 +77,6 @@ export default function OrderDetailPage() {
     [order?.items],
   );
 
-  function toggleSample(sampleId: string) {
-    setSelectedSampleIds((prev) =>
-      prev.includes(sampleId) ? prev.filter((idValue) => idValue !== sampleId) : [...prev, sampleId],
-    );
-  }
-
   async function handleSaveOrder(e: FormEvent) {
     e.preventDefault();
     if (!order) return;
@@ -102,7 +85,6 @@ export default function OrderDetailPage() {
     setError('');
     try {
       const updated = await orderService.update(order.id, {
-        sampleIds: selectedSampleIds,
         notes: notes || null,
         manualAdjustmentNet: parseFloat(manualAdjustmentNet) || 0,
       });
@@ -296,18 +278,17 @@ export default function OrderDetailPage() {
             </button>
           </div>
           <div className="grid max-h-56 grid-cols-1 gap-2 overflow-y-auto rounded-lg border border-gray-200 p-3 dark:border-gray-700">
-            {availableSamples.map((sample) => (
-              <label key={sample.id} className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                <input
-                  type="checkbox"
-                  checked={selectedSampleIds.includes(sample.id)}
-                  onChange={() => toggleSample(sample.id)}
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                <span>{sample.sampleCode}</span>
-              </label>
+            {(order.samples || []).map((sample) => (
+              <div
+                key={sample.id}
+                onClick={() => navigate(`/samples/${sample.id}`)}
+                className="flex cursor-pointer items-center justify-between rounded px-1 py-0.5 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+              >
+                <span className="text-sm font-medium text-gray-900 dark:text-white">{sample.sampleCode}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">{sample.status}</span>
+              </div>
             ))}
-            {availableSamples.length === 0 && (
+            {(order.samples || []).length === 0 && (
               <p className="text-sm text-gray-500 dark:text-gray-400">{t('common.noData')}</p>
             )}
           </div>

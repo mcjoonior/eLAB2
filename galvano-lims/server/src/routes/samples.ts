@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, authorizeRoles } from '../middleware/auth';
 import {
   getSamples,
   getSampleById,
@@ -7,6 +7,7 @@ import {
   updateSample,
   changeSampleStatus,
   getAssignableUsers,
+  deleteSample,
 } from '../controllers/sampleController';
 
 const router = Router();
@@ -31,5 +32,8 @@ router.put('/:id', updateSample as any);
 
 // PATCH /api/samples/:id/status - Zmiana statusu probki (workflow)
 router.patch('/:id/status', changeSampleStatus as any);
+
+// DELETE /api/samples/:id - Usuniecie probki (tylko ADMIN, gdy brak analiz)
+router.delete('/:id', authorizeRoles('ADMIN') as any, deleteSample as any);
 
 export default router;

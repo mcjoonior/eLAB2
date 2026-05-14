@@ -50,4 +50,8 @@ export const sampleService = {
     const response = await api.patch(`/samples/${id}/status`, { status });
     return response.data;
   },
+
+  async delete(id: string): Promise<void> {
+    await api.delete(`/samples/${id}`);
+  },
 };

@@ -144,6 +144,10 @@ export default function AnalysisDetailPage() {
   const [actionSuccess, setActionSuccess] = useState('');
   const [actionError, setActionError] = useState('');
 
+  // Delete analysis
+  const [confirmDeleteAnalysis, setConfirmDeleteAnalysis] = useState(false);
+  const [deletingAnalysis, setDeletingAnalysis] = useState(false);
+
   useEffect(() => {
     if (id) {
       fetchAnalysis();
@@ -448,6 +452,20 @@ export default function AnalysisDetailPage() {
     }
   }
 
+  async function handleDeleteAnalysis() {
+    setDeletingAnalysis(true);
+    setActionError('');
+    try {
+      await analysisService.delete(id!);
+      navigate('/analyses');
+    } catch {
+      setActionError('Nie udało się usunąć analizy.');
+      setConfirmDeleteAnalysis(false);
+    } finally {
+      setDeletingAnalysis(false);
+    }
+  }
+
   async function handleApprove() {
     setApprovingAnalysis(true);
     setActionError('');
@@ -652,9 +670,47 @@ export default function AnalysisDetailPage() {
               )}
               Wyślij raport
             </button>
+            {isAdmin && (
+              <button
+                onClick={() => setConfirmDeleteAnalysis(true)}
+                className="inline-flex items-center gap-2 rounded-lg border border-red-300 dark:border-red-800 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+              >
+                <Trash2 className="h-4 w-4" />
+                Usuń analizę
+              </button>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Confirm delete analysis dialog */}
+      {confirmDeleteAnalysis && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setConfirmDeleteAnalysis(false)} />
+          <div className="relative z-10 w-full max-w-sm rounded-xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-800">
+            <h3 className="mb-2 text-base font-semibold text-gray-900 dark:text-white">Usuń analizę</h3>
+            <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+              Czy na pewno chcesz usunąć analizę <strong>{analysis.analysisCode}</strong>? Tej operacji nie można cofnąć.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmDeleteAnalysis(false)}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                Anuluj
+              </button>
+              <button
+                onClick={handleDeleteAnalysis}
+                disabled={deletingAnalysis}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+              >
+                {deletingAnalysis && <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
+                Usuń
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Results table */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">

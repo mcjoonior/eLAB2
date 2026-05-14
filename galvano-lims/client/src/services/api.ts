@@ -21,6 +21,28 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Singleton refresh promise — prevents concurrent refresh storms.
+// When multiple requests get 401 simultaneously, only one /refresh call
+// is made; the rest wait for the same promise to resolve.
+let refreshPromise: Promise<string> | null = null;
+
+async function refreshAccessToken(): Promise<string> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = axios
+    .post('/api/auth/refresh', {}, { withCredentials: true })
+    .then((res) => {
+      const token: string = res.data.data.accessToken;
+      useAuthStore.getState().setAccessToken(token);
+      return token;
+    })
+    .finally(() => {
+      refreshPromise = null;
+    });
+
+  return refreshPromise;
+}
+
 // Response interceptor - handle token refresh
 api.interceptors.response.use(
   (response) => response,
@@ -31,12 +53,8 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const response = await axios.post('/api/auth/refresh', {}, { withCredentials: true });
-        const { accessToken } = response.data.data;
-
-        useAuthStore.getState().setAccessToken(accessToken);
+        const accessToken = await refreshAccessToken();
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-
         return api(originalRequest);
       } catch {
         useAuthStore.getState().logout();
