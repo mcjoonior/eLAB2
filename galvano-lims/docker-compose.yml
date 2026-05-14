@@ -36,9 +36,9 @@ services:
       PORT: 3001
       NODE_ENV: production
       CORS_ORIGIN: http://localhost:5173
-      GUS_ENABLED: "false"
+      GUS_ENABLED: "true"
       GUS_BIR_URL: https://wyszukiwarkaregon.stat.gov.pl/wsBIR/UslugaBIRzewnPubl.svc
-      GUS_BIR_KEY: ""
+      GUS_BIR_KEY: "d51d4dd7a07e417fb746"
       GUS_TIMEOUT_MS: "12000"
       UPLOAD_DIR: ./uploads
       REPORTS_DIR: ./reports

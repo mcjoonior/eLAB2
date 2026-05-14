@@ -247,7 +247,16 @@ export const lookupClientInGus = async (req: AuthenticatedRequest, res: Response
       return;
     }
 
-    const found = await lookupCompanyByNipInGus(nip);
+    let found;
+    try {
+      found = await lookupCompanyByNipInGus(nip);
+    } catch (gusError: any) {
+      if (gusError?.message?.includes('wyłączona') || gusError?.message?.includes('disabled')) {
+        res.status(503).json({ error: 'Integracja z GUS jest wyłączona na tym serwerze.' });
+        return;
+      }
+      throw gusError;
+    }
     if (!found) {
       res.status(404).json({ error: 'Nie znaleziono podmiotu w bazie GUS dla podanego NIP.' });
       return;

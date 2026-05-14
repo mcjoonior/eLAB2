@@ -9,6 +9,7 @@ import { useThemeStore } from '@/store/themeStore';
 
 export function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { setTheme } = useThemeStore();
   const { i18n } = useTranslation();
 
@@ -25,10 +26,15 @@ export function AppLayout() {
   }, [setTheme, i18n]);
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background">
-      <Topbar onMenuClick={() => setSidebarOpen(true)} />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+    <div className="flex h-screen overflow-hidden bg-background">
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        isCollapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
+      />
+      <div className="flex flex-1 flex-col overflow-hidden min-w-0">
+        <Topbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <Outlet />
         </main>

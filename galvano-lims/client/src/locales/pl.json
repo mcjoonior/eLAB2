@@ -18,7 +18,7 @@
     "settings": "Ustawienia",
     "users": "Użytkownicy",
     "priceList": "Cennik analiz",
-    "auditLog": "Dziennik audytu",
+    "auditLog": "Rejestr aktywności",
     "logout": "Wyloguj"
   },
   "auth": {
@@ -266,7 +266,7 @@
     "title": "Administracja",
     "users": "Zarządzanie użytkownikami",
     "settings": "Ustawienia firmy",
-    "auditLog": "Dziennik audytu",
+    "auditLog": "Rejestr aktywności",
     "addUser": "Dodaj użytkownika",
     "editUser": "Edytuj użytkownika",
     "role": "Rola",
