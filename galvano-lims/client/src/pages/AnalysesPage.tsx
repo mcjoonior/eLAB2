@@ -42,6 +42,7 @@ export default function AnalysesPage() {
   // Create dialog
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [samples, setSamples] = useState<Sample[]>([]);
+  const [lockedSample, setLockedSample] = useState<Sample | null>(null);
   const [priceListItems, setPriceListItems] = useState<AnalysisPriceListItem[]>([]);
   const [samplesLoading, setSamplesLoading] = useState(false);
   const [newAnalysis, setNewAnalysis] = useState({ sampleId: '', priceListId: '', notes: '' });
@@ -88,17 +89,27 @@ export default function AnalysesPage() {
   async function openCreateDialog(prefilledSampleId?: string) {
     setShowCreateDialog(true);
     setCreateError('');
+    setLockedSample(null);
     setNewAnalysis({ sampleId: prefilledSampleId || '', priceListId: '', notes: '' });
     setSamplesLoading(true);
     try {
-      const [samplesRes, priceListRes] = await Promise.all([
-        sampleService.getAll({ limit: 200, status: 'REGISTERED' }),
-        priceListService.getAll({ limit: 200, isActive: true, analysisType: 'CHEMICAL' }),
-      ]);
-      setSamples(samplesRes.data);
-      setPriceListItems(priceListRes.data);
+      if (prefilledSampleId) {
+        const [sample, priceListRes] = await Promise.all([
+          sampleService.getById(prefilledSampleId),
+          priceListService.getAll({ limit: 200, isActive: true }),
+        ]);
+        setLockedSample(sample);
+        setPriceListItems(priceListRes.data);
+      } else {
+        const [samplesRes, priceListRes] = await Promise.all([
+          sampleService.getAll({ limit: 200 }),
+          priceListService.getAll({ limit: 200, isActive: true }),
+        ]);
+        setSamples(samplesRes.data);
+        setPriceListItems(priceListRes.data);
+      }
     } catch {
-      setCreateError('Nie udało się pobrać listy próbek lub cennika.');
+      setCreateError('Nie udało się pobrać danych próbki lub cennika.');
     } finally {
       setSamplesLoading(false);
     }
@@ -386,6 +397,13 @@ export default function AnalysesPage() {
                 </label>
                 {samplesLoading ? (
                   <div className="text-sm text-gray-500">Ładowanie próbek...</div>
+                ) : lockedSample ? (
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50 px-3 py-2.5 text-sm text-gray-900 dark:text-white">
+                    <span className="font-medium">{lockedSample.sampleCode}</span>
+                    <span className="ml-2 text-gray-500 dark:text-gray-400">
+                      {lockedSample.client?.companyName} · {lockedSample.process?.name}
+                    </span>
+                  </div>
                 ) : (
                   <select
                     value={newAnalysis.sampleId}
@@ -396,7 +414,7 @@ export default function AnalysesPage() {
                     <option value="">-- Wybierz próbkę --</option>
                     {samples.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.sampleCode} - {s.client?.companyName || 'Brak klienta'} ({s.process?.name || 'Brak procesu'})
+                        {s.sampleCode} – {s.client?.companyName || 'Brak klienta'} ({s.process?.name || 'Brak procesu'})
                       </option>
                     ))}
                   </select>
