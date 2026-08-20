@@ -31,6 +31,11 @@ Aplikacja będzie dostępna pod:
 - Backend API: http://localhost:3001
 - PostgreSQL: localhost:5432
 
+## Wdrożenie na Debian VPS
+
+Gotowa konfiguracja produkcyjna z Docker Compose, prywatną siecią usług i
+automatycznym HTTPS przez Caddy znajduje się w [DEPLOYMENT.md](DEPLOYMENT.md).
+
 ## Uruchomienie lokalne (development)
 
 ### 1. Baza danych

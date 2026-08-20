@@ -168,28 +168,38 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }: Side
 
       <aside
         className={`
-          fixed left-0 top-0 z-50 h-screen w-64 flex flex-col
+          fixed left-0 top-0 z-50 h-screen w-56 flex flex-col
           transition-all duration-200 ease-in-out
           lg:relative lg:z-auto lg:translate-x-0 lg:h-full
-          ${isCollapsed ? 'lg:w-16' : 'lg:w-64'}
+          ${isCollapsed ? 'lg:w-16' : 'lg:w-56'}
           ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           ${theme.aside}
         `}
       >
         {/* Branding header */}
-        <div className={`flex items-center gap-3 px-4 py-4 flex-shrink-0 ${theme.headerBorder} ${isCollapsed ? 'lg:justify-center lg:px-2' : ''}`}>
-          <div className="h-16 w-16 flex-shrink-0 flex items-center justify-center overflow-hidden rounded-lg bg-white/10">
+        <NavLink
+          to="/"
+          end
+          onClick={onClose}
+          aria-label={`${companyName} — panel główny`}
+          className={`flex flex-col items-center gap-1 px-4 py-3 flex-shrink-0 ${theme.headerBorder} ${
+            isCollapsed ? 'lg:px-2 lg:py-3' : ''
+          }`}
+        >
+          <div className={`h-10 w-32 flex-shrink-0 flex items-center justify-center overflow-hidden ${
+            isCollapsed ? 'lg:h-11 lg:w-11' : ''
+          }`}>
             {logoUrl ? (
-              <img src={logoUrl} alt="Logo" className="h-14 w-14 object-contain" />
+              <img src={logoUrl} alt={`${companyName} logo`} className="h-full w-full object-contain" />
             ) : (
-              <FlaskConical className="h-5 w-5 text-white/80" />
+              <FlaskConical className="h-8 w-8 text-white/80" />
             )}
           </div>
-          <div className={`min-w-0 flex-1 ${isCollapsed ? 'lg:hidden' : ''}`}>
-            <p className={`text-sm font-bold leading-tight truncate ${theme.brandName}`}>{companyName}</p>
-            <p className={`text-[11px] leading-tight ${theme.brandSub}`}>eLAB LIMS</p>
+          <div className={`w-full min-w-0 text-center ${isCollapsed ? 'lg:hidden' : ''}`}>
+            <p className={`text-sm font-bold leading-snug break-words ${theme.brandName}`}>{companyName}</p>
+            <p className={`mt-0.5 text-[11px] leading-tight ${theme.brandSub}`}>eLAB LIMS</p>
           </div>
-        </div>
+        </NavLink>
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-3 px-2">

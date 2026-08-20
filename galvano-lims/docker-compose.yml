@@ -27,6 +27,9 @@ services:
       dockerfile: Dockerfile
     container_name: galvano-lims-server
     restart: unless-stopped
+    env_file:
+      - path: ./server/.env
+        required: false
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/galvano_lims?schema=public&connection_limit=10&pool_timeout=30&connect_timeout=30
       JWT_SECRET: dev-jwt-secret-change-in-production
@@ -38,7 +41,6 @@ services:
       CORS_ORIGIN: http://localhost:5173
       GUS_ENABLED: "true"
       GUS_BIR_URL: https://wyszukiwarkaregon.stat.gov.pl/wsBIR/UslugaBIRzewnPubl.svc
-      GUS_BIR_KEY: "d51d4dd7a07e417fb746"
       GUS_TIMEOUT_MS: "12000"
       UPLOAD_DIR: ./uploads
       REPORTS_DIR: ./reports
